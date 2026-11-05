@@ -73,7 +73,10 @@ Verification: `cargo test -p rc-dotnet -p rc-core --lib`. The real `TenProjects`
 fixture is loaded through a filter and both selected project files are parsed.
 Parser regressions cover classic and XML parent solutions, Windows separators, filters
 in a subdirectory, empty selections, duplicate selections and invalid input.
-Remaining: real SDK build/test execution, graphical explorer verification, Roslyn behavior
+A headless application regression also renders the real explorer with the filtered
+TenProjects solution and checks that selected modules appear and excluded modules do not.
+Verification: `cargo test -p rc-app solution_filter_explorer_shows_only_selected_real_projects`.
+Remaining: real SDK build/test execution, Roslyn behavior
 with filters, interactive editing, and dependency-loading behavior. B-14 remains 🚧.
 The existing workspace root stays the filter directory; filters stored outside the
 solution root need a separate watcher/search-root audit.
@@ -135,7 +138,7 @@ Source / reuse boundary: `crates/rc-dotnet; crates/rc-core/src/workspace.rs`.
 | B-11 | Launch settings profiles | 🟢 | Exercise on a real .NET fixture; record evidence. |
 | B-12 | NuGet search | 🟢 | Exercise on a real .NET fixture; record evidence. |
 | B-13 | NuGet installation and removal | 🟢 | Exercise on a real .NET fixture; record evidence. |
-| B-14 | JSON .slnf solution filters | 🚧 | Parser implemented; verify SDK, UI and language-server behavior. |
+| B-14 | JSON .slnf solution filters | 🚧 | Parser and explorer verified; validate SDK and language-server behavior. |
 | B-15 | Interactive filter creation and editing | ⬜ | Implement with integration and UI acceptance evidence. |
 | B-16 | Unload and reload individual projects | ⬜ | Implement with integration and UI acceptance evidence. |
 | B-17 | Project references editor | ⬜ | Implement with integration and UI acceptance evidence. |

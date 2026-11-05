@@ -611,3 +611,30 @@ fn screens_readme() {
         h.state_mut().insight.stop();
     }
 }
+
+#[test]
+fn solution_filter_explorer_shows_only_selected_real_projects() {
+    let _home = HOME_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let home = tempfile::tempdir().unwrap();
+    let filter = home.path().join("Selected.slnf");
+    let root = fixtures().join("TenProjects");
+    let json = serde_json::json!({"solution": {
+        "path": root.join("TenProjects.slnx"),
+        "projects": ["src/Module01/Module01.csproj", "src/Module10/Module10.csproj"]
+    }});
+    std::fs::write(&filter, json.to_string()).unwrap();
+    let solution = rc_dotnet::Solution::load(&filter).unwrap();
+    let mut app = test_app(home.path(), true);
+    // Exercise the real explorer without starting SDK downloads or project processes.
+    app.explorer.expanded.extend(["sln".to_string(), "sf:/src".to_string()]);
+    app.workspace = Some(crate::app::WorkspaceState {
+        ws: rc_core::Workspace::open(&filter).unwrap(),
+        solution: Some(solution),
+    });
+    let mut h = harness(app, vec2(1000.0, 700.0));
+    h.run_steps(3);
+    assert!(h.query_by_label("Module01").is_some());
+    assert!(h.query_by_label("Module10").is_some());
+    assert!(h.query_by_label("Module02").is_none());
+    assert!(h.query_by_label("Module09").is_none());
+}
