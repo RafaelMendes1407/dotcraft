@@ -20,6 +20,7 @@ pub enum SettingsPage {
 pub enum Dialog {
     Settings { draft: Box<Settings>, page: SettingsPage },
     About,
+    SdkSelection(Box<crate::ui::sdk_selection::SdkSelection>),
     GotoLine { text: String, focus: bool },
     NewFile { dir: PathBuf, name: String, kind: crate::item_templates::ItemKind, error: Option<String> },
     Rename { path: PathBuf, name: String, error: Option<String> },
@@ -62,6 +63,7 @@ pub fn show(app: &mut DotCraftApp, ctx: &Context) {
     let outcome = match &mut dialog {
         Dialog::Settings { draft, page } => settings(app, ctx, draft, page),
         Dialog::About => about(ctx),
+        Dialog::SdkSelection(state) => sdk_selection(ctx, state),
         Dialog::GotoLine { text, focus } => goto_line(app, ctx, text, focus),
         Dialog::NewFile { dir, name, kind, error } => new_file(app, ctx, dir, name, *kind, error),
         Dialog::Rename { path, name, error } => rename(app, ctx, path, name, error),
@@ -164,7 +166,7 @@ fn settings(app: &mut DotCraftApp, ctx: &Context, draft: &mut Settings, page: &m
                 ui.set_width(content_width);
                 ui.set_height(layout.height);
                 if *page == SettingsPage::Tools {
-                    settings_tools(ui, draft);
+                    settings_tools(ui, draft, app);
                     return;
                 }
                 egui::Grid::new("settings_grid").num_columns(2).spacing(vec2(16.0, 10.0)).show(ui, |ui| match page {
@@ -260,7 +262,16 @@ fn settings(app: &mut DotCraftApp, ctx: &Context, draft: &mut Settings, page: &m
     if cancel || esc { Outcome::Close } else { Outcome::Keep }
 }
 
-fn settings_tools(ui: &mut Ui, draft: &mut Settings) {
+fn settings_tools(ui: &mut Ui, draft: &mut Settings, app: &mut DotCraftApp) {
+    ui.label(tr(".NET SDK"));
+    if ui.add_enabled(app.workspace.is_some(), egui::Button::new(tr("Manage project SDK…"))).clicked()
+        && let Some(workspace) = &app.workspace
+    {
+        app.dialog = Some(Dialog::SdkSelection(Box::new(crate::ui::sdk_selection::SdkSelection::new(
+            workspace.ws.root.clone(), draft.dotnet_path.clone().unwrap_or_else(|| PathBuf::from("dotnet")), app.waker.clone(),
+        ))));
+    }
+    ui.add_space(10.0);
     ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Wrap);
     for (label, value) in [
         (tr(".NET CLI"), &mut draft.dotnet_path),
@@ -283,6 +294,15 @@ fn settings_tools(ui: &mut Ui, draft: &mut Settings) {
         });
         ui.add_space(10.0);
     }
+}
+
+fn sdk_selection(ctx: &Context, state: &mut crate::ui::sdk_selection::SdkSelection) -> Outcome {
+    let width = (ctx.content_rect().width() - 48.0).clamp(200.0, 520.0);
+    let ((close, can_close), esc) = modal(ctx, "sdk_selection", width, |ui| {
+        title(ui, tr("Project SDK"));
+        state.contents(ui)
+    });
+    if close || (esc && can_close) { Outcome::Close } else { Outcome::Keep }
 }
 
 fn lang_code(l: Lang) -> &'static str {

@@ -617,5 +617,18 @@
     "Editor Only": "仅编辑器",
     "Editor and Preview": "编辑器和预览",
     "Preview Only": "仅预览"
+  },
+  "sdk-selection": {
+    ".NET SDK": ".NET SDK",
+    "Manage project SDK…": "管理项目 SDK…",
+    "Project SDK": "项目 SDK",
+    "Writes global.json in the project root. Ancestor files are never changed.": "在项目根目录写入 global.json，不修改上级目录的文件。",
+    "Current SDK pin: {version}": "当前固定 SDK：{version}",
+    "Installed SDK": "已安装的 SDK",
+    "Select an SDK": "选择 SDK",
+    "No installed SDKs were found.": "未找到已安装的 SDK。",
+    "Could not update SDK selection: {error}": "无法更新 SDK 选择：{error}",
+    "Save SDK selection": "保存 SDK 选择",
+    "None": "无"
   }
 }

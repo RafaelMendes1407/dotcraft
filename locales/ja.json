@@ -617,5 +617,18 @@
     "Editor Only": "エディターのみ",
     "Editor and Preview": "エディターとプレビュー",
     "Preview Only": "プレビューのみ"
+  },
+  "sdk-selection": {
+    ".NET SDK": ".NET SDK",
+    "Manage project SDK…": "プロジェクト SDK を管理…",
+    "Project SDK": "プロジェクト SDK",
+    "Writes global.json in the project root. Ancestor files are never changed.": "プロジェクトルートに global.json を保存します。親フォルダーのファイルは変更しません。",
+    "Current SDK pin: {version}": "現在の SDK 固定バージョン: {version}",
+    "Installed SDK": "インストール済み SDK",
+    "Select an SDK": "SDK を選択",
+    "No installed SDKs were found.": "インストール済み SDK が見つかりません。",
+    "Could not update SDK selection: {error}": "SDK の選択を更新できませんでした: {error}",
+    "Save SDK selection": "SDK の選択を保存",
+    "None": "なし"
   }
 }

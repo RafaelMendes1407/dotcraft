@@ -617,5 +617,18 @@
     "Editor Only": "Somente editor",
     "Editor and Preview": "Editor e visualização",
     "Preview Only": "Somente visualização"
+  },
+  "sdk-selection": {
+    ".NET SDK": ".NET SDK",
+    "Manage project SDK…": "Gerenciar SDK do projeto…",
+    "Project SDK": "SDK do projeto",
+    "Writes global.json in the project root. Ancestor files are never changed.": "Grava global.json na raiz do projeto. Arquivos de pastas superiores não são alterados.",
+    "Current SDK pin: {version}": "Versão fixada do SDK: {version}",
+    "Installed SDK": "SDK instalado",
+    "Select an SDK": "Selecione um SDK",
+    "No installed SDKs were found.": "Nenhum SDK instalado foi encontrado.",
+    "Could not update SDK selection: {error}": "Não foi possível atualizar o SDK: {error}",
+    "Save SDK selection": "Salvar seleção do SDK",
+    "None": "Nenhum"
   }
 }
