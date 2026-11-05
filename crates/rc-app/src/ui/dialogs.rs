@@ -20,7 +20,7 @@ pub enum SettingsPage {
 pub enum Dialog {
     Settings { draft: Box<Settings>, page: SettingsPage },
     About,
-    SdkSelection(Box<crate::ui::sdk_selection::SdkSelection>),
+    SdkSelection { state: Box<crate::ui::sdk_selection::SdkSelection>, parent_draft: Box<Settings>, parent_page: SettingsPage },
     GotoLine { text: String, focus: bool },
     NewFile { dir: PathBuf, name: String, kind: crate::item_templates::ItemKind, error: Option<String> },
     Rename { path: PathBuf, name: String, error: Option<String> },
@@ -63,7 +63,12 @@ pub fn show(app: &mut DotCraftApp, ctx: &Context) {
     let outcome = match &mut dialog {
         Dialog::Settings { draft, page } => settings(app, ctx, draft, page),
         Dialog::About => about(ctx),
-        Dialog::SdkSelection(state) => sdk_selection(ctx, state),
+        Dialog::SdkSelection { state, parent_draft, parent_page } => {
+            if state.show(ctx) {
+                app.dialog = Some(Dialog::Settings { draft: parent_draft.clone(), page: *parent_page });
+            }
+            Outcome::Keep
+        }
         Dialog::GotoLine { text, focus } => goto_line(app, ctx, text, focus),
         Dialog::NewFile { dir, name, kind, error } => new_file(app, ctx, dir, name, *kind, error),
         Dialog::Rename { path, name, error } => rename(app, ctx, path, name, error),
@@ -267,9 +272,13 @@ fn settings_tools(ui: &mut Ui, draft: &mut Settings, app: &mut DotCraftApp) {
     if ui.add_enabled(app.workspace.is_some(), egui::Button::new(tr("Manage project SDK…"))).clicked()
         && let Some(workspace) = &app.workspace
     {
-        app.dialog = Some(Dialog::SdkSelection(Box::new(crate::ui::sdk_selection::SdkSelection::new(
-            workspace.ws.root.clone(), draft.dotnet_path.clone().unwrap_or_else(|| PathBuf::from("dotnet")), app.waker.clone(),
-        ))));
+        app.dialog = Some(Dialog::SdkSelection {
+            state: Box::new(crate::ui::sdk_selection::SdkSelection::new(
+                workspace.ws.root.clone(), draft.dotnet_path.clone().unwrap_or_else(|| PathBuf::from("dotnet")), app.waker.clone(),
+            )),
+            parent_draft: Box::new(draft.clone()),
+            parent_page: SettingsPage::Tools,
+        });
     }
     ui.add_space(10.0);
     ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Wrap);
@@ -294,10 +303,6 @@ fn settings_tools(ui: &mut Ui, draft: &mut Settings, app: &mut DotCraftApp) {
         });
         ui.add_space(10.0);
     }
-}
-
-fn sdk_selection(ctx: &Context, state: &mut crate::ui::sdk_selection::SdkSelection) -> Outcome {
-    if state.show(ctx) { Outcome::Close } else { Outcome::Keep }
 }
 
 fn lang_code(l: Lang) -> &'static str {
@@ -1111,5 +1116,80 @@ mod responsive_settings_tests {
         harness.run_steps(2);
         assert!(harness.state().dialog.is_none());
         assert_eq!(harness.state().settings.editor_font_size, original_size);
+    }
+}
+
+#[cfg(all(test, unix))]
+mod sdk_settings_return_tests {
+    use super::*;
+    use egui_kittest::kittest::{NodeT, Queryable};
+    use std::os::unix::fs::PermissionsExt;
+
+    #[test]
+    fn closing_or_saving_sdk_chooser_restores_settings_draft_and_cancel_discards_it() {
+        let _home = crate::screens::HOME_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        for save in [false, true] {
+            let temp = tempfile::tempdir().unwrap();
+            let root = temp.path().join("project");
+            std::fs::create_dir(&root).unwrap();
+            let fixture = crate::screens::fixtures().join("Shop/src/Shop.Api/Shop.Api.csproj");
+            std::fs::copy(fixture, root.join("Shop.Api.csproj")).unwrap();
+            let host = temp.path().join("dotnet");
+            std::fs::write(&host, "#!/bin/sh\nprintf '10.0.100 [/sdk]\\n'\n").unwrap();
+            std::fs::set_permissions(&host, std::fs::Permissions::from_mode(0o755)).unwrap();
+            let mut app = crate::screens::test_app(&temp.path().join("home"), true);
+            app.workspace = Some(crate::app::WorkspaceState { ws: rc_core::Workspace::open(&root).unwrap(), solution: None });
+            let original_path = app.settings.dotnet_path.clone();
+            let original_font = app.settings.editor_font_size;
+            let mut draft = app.settings.clone();
+            draft.dotnet_path = None;
+            draft.editor_font_size = original_font + 2.0;
+            app.dialog = Some(Dialog::Settings { draft: Box::new(draft), page: SettingsPage::Tools });
+            let mut h = crate::screens::harness(app, vec2(800.0, 500.0));
+            h.run_steps(5);
+            h.get_by_role_and_label(egui::accesskit::Role::TextInput, tr(".NET CLI")).focus();
+            h.run_steps(1);
+            h.get_by_role_and_label(egui::accesskit::Role::TextInput, tr(".NET CLI")).type_text(host.to_str().unwrap());
+            h.run_steps(2);
+            h.get_by_label(tr("Manage project SDK…")).click();
+            h.run_steps(3);
+            assert!(matches!(h.state().dialog, Some(Dialog::SdkSelection { .. })));
+            if save {
+                let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+                while h.get_by_role(egui::accesskit::Role::ComboBox).accesskit_node().is_disabled() && std::time::Instant::now() < deadline {
+                    h.run_steps(1);
+                    std::thread::sleep(std::time::Duration::from_millis(5));
+                }
+                h.get_by_role(egui::accesskit::Role::ComboBox).click();
+                h.run_steps(2);
+                h.get_by_label("10.0.100").click();
+                h.run_steps(2);
+                h.get_by_label(tr("Save SDK selection")).click();
+                h.run_steps(2);
+                while matches!(h.state().dialog, Some(Dialog::SdkSelection { .. })) && std::time::Instant::now() < deadline {
+                    h.run_steps(1);
+                    std::thread::sleep(std::time::Duration::from_millis(5));
+                }
+            } else {
+                h.get_by_label(tr("Close")).click();
+                h.run_steps(3);
+            }
+            h.run_steps(3);
+            match h.state().dialog.as_ref() {
+                Some(Dialog::Settings { draft, page: SettingsPage::Tools }) => {
+                    assert_eq!(draft.dotnet_path.as_ref(), Some(&host));
+                    assert_eq!(draft.editor_font_size, original_font + 2.0);
+                }
+                _ => panic!("SDK close must return to the Tools settings draft"),
+            }
+            assert_eq!(h.state().settings.dotnet_path, original_path);
+            assert_eq!(h.state().settings.editor_font_size, original_font);
+            h.get_by_label(tr("Cancel")).click();
+            h.run_steps(2);
+            assert!(h.state().dialog.is_none());
+            assert_eq!(h.state().settings.dotnet_path, original_path);
+            assert_eq!(h.state().settings.editor_font_size, original_font);
+            assert_eq!(root.join("global.json").exists(), save);
+        }
     }
 }

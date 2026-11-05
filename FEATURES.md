@@ -102,6 +102,10 @@ uses an atomic replacement. A best-effort snapshot check detects edits present b
 saving; it is not a lock against concurrent writers. It refuses malformed/commented JSON, stale snapshots and
 symlinked policy files. Ancestor policies are never modified; a new workspace policy
 shadows them. Existing CLI operations continue to resolve SDKs through `global.json`.
+Closing or saving the SDK chooser returns to the original Tools Settings draft;
+it preserves edits to global settings without applying them. Cancel still discards
+that draft. A UI regression types a CLI path, then exercises both Close and Save
+and verifies the restored page, draft contents and unapplied global settings.
 The SDK chooser saves independently of the global Settings draft. Its body scrolls
 while Save and Close remain outside the scroll area. Long paths are truncated with
 the complete path available on hover. Compact-window tests cover 480×320 and 800×300
