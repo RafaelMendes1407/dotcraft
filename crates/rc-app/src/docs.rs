@@ -25,6 +25,8 @@ pub struct Doc {
     pub conflict: bool,
     /// Markdown files: editor, preview or both side by side.
     pub md_view: Option<MdView>,
+    detected_indent: rc_text::commands::Indent,
+    style_revision: u64,
 }
 
 /// How a Markdown file is shown (Rider's editor / editor and preview / preview switch).
@@ -52,6 +54,38 @@ pub struct Docs {
     pub pool: ParserPool,
     /// Recently opened files, most recent first (⌘E).
     pub recent: Vec<PathBuf>,
+    styles: StyleWorker,
+}
+
+/// A single background reader per document collection; no filesystem work on the UI thread.
+struct StyleWorker {
+    requests: std::sync::mpsc::Sender<(u64, u64, PathBuf)>,
+    results: rc_core::Inbox<(u64, u64, rc_core::editorconfig::Indentation)>,
+    cancelled: std::sync::Arc<std::sync::atomic::AtomicBool>,
+}
+
+impl StyleWorker {
+    fn new(waker: rc_core::Waker) -> Self {
+        let (requests, queue) = std::sync::mpsc::channel::<(u64, u64, PathBuf)>();
+        let results = rc_core::Inbox::new(waker);
+        let out = results.sender();
+        let cancelled = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let stop = cancelled.clone();
+        std::thread::spawn(move || {
+            while let Ok((id, revision, path)) = queue.recv() {
+                if let Some(style) = rc_core::editorconfig::for_file(&path, &stop) {
+                    if !out.send((id, revision, style)) { break; }
+                } else { break; }
+            }
+        });
+        Self { requests, results, cancelled }
+    }
+}
+
+impl Drop for StyleWorker {
+    fn drop(&mut self) {
+        self.cancelled.store(true, std::sync::atomic::Ordering::Relaxed);
+    }
 }
 
 /// Reads a text file: (text without BOM, had BOM). Binary files are refused.
@@ -77,7 +111,11 @@ pub fn read_text(path: &Path) -> Result<(String, bool, Option<SystemTime>), Stri
 
 impl Docs {
     pub fn new(pool: ParserPool) -> Self {
-        Docs { list: Vec::new(), active: None, next_id: 1, pool, recent: Vec::new() }
+        Self::with_waker(pool, rc_core::Waker::noop())
+    }
+
+    pub fn with_waker(pool: ParserPool, waker: rc_core::Waker) -> Self {
+        Docs { list: Vec::new(), active: None, next_id: 1, pool, recent: Vec::new(), styles: StyleWorker::new(waker) }
     }
 
     pub fn index_of(&self, path: &Path) -> Option<usize> {
@@ -117,7 +155,9 @@ impl Docs {
             editor.read_only = true;
         }
         let md_view = path.extension().and_then(|e| e.to_str()).is_some_and(|e| e.eq_ignore_ascii_case("md") || e.eq_ignore_ascii_case("markdown")).then_some(MdView::Split);
-        self.list.push(Doc { editor, path: path.clone(), mtime, bom, pinned: false, preview: false, conflict: false, md_view });
+        let detected_indent = editor.indent.clone();
+        let _ = self.styles.requests.send((id, 0, path.clone()));
+        self.list.push(Doc { detected_indent, style_revision: 0, editor, path: path.clone(), mtime, bom, pinned: false, preview: false, conflict: false, md_view });
         let i = self.list.len() - 1;
         self.activate(i);
         Ok(i)
@@ -202,6 +242,9 @@ impl Docs {
 
     /// A file changed on disk: unmodified documents reload, modified ones are flagged.
     pub fn on_disk_change(&mut self, path: &Path) {
+        if path.file_name().is_some_and(|name| name == ".editorconfig") {
+            self.refresh_styles();
+        }
         let Some(i) = self.index_of(path) else { return };
         let doc = &mut self.list[i];
         let mtime = std::fs::metadata(path).and_then(|m| m.modified()).ok();
@@ -226,6 +269,7 @@ impl Docs {
     /// Checks every open document against the disk (the window got the focus back: catches
     /// changes the watcher could not see).
     pub fn check_disk_changes(&mut self) {
+        self.refresh_styles();
         let paths: Vec<PathBuf> = self.list.iter().map(|d| d.path.clone()).collect();
         for p in paths {
             self.on_disk_change(&p);
@@ -249,10 +293,34 @@ impl Docs {
         Ok(())
     }
 
+    /// Re-read settings after config changes or focus restoration. Stale results are ignored.
+    fn refresh_styles(&mut self) {
+        for doc in &mut self.list {
+            doc.style_revision = doc.style_revision.wrapping_add(1);
+            let _ = self.styles.requests.send((doc.editor.id, doc.style_revision, doc.path.clone()));
+        }
+    }
+
+    fn poll_styles(&mut self) -> bool {
+        let styles = self.styles.results.drain();
+        let any = !styles.is_empty();
+        for (id, revision, style) in styles {
+            let Some(doc) = self.list.iter_mut().find(|d| d.editor.id == id && d.style_revision == revision) else { continue };
+            let base = &doc.detected_indent;
+            let tabs = style.tabs.unwrap_or(base.unit == "\t");
+            let size = style.size.unwrap_or_else(|| if base.unit == "\t" { base.tab_width } else { base.unit.len() });
+            doc.editor.indent = rc_text::commands::Indent {
+                unit: if tabs { "\t".into() } else { " ".repeat(size) },
+                tab_width: style.tab_width.unwrap_or(base.tab_width),
+            };
+        }
+        any
+    }
+
     /// Takes finished background parses; returns whether any arrived (repaint).
     pub fn poll_parses(&mut self) -> bool {
         let results = self.pool.poll();
-        let any = !results.is_empty();
+        let any = !results.is_empty() | self.poll_styles();
         for r in results {
             if let Some(doc) = self.list.iter_mut().find(|d| d.editor.id == r.doc) {
                 doc.editor.syntax.accept(r);
@@ -278,6 +346,41 @@ impl Docs {
 mod tests {
     use super::*;
     use std::sync::Arc;
+
+    #[test]
+    fn editorconfig_drives_real_csharp_edits_and_refreshes_without_dirtying_documents() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("PriceCalculator.cs");
+        let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/Shop/src/Shop.Core/PriceCalculator.cs");
+        std::fs::copy(fixture, &file).unwrap();
+        let config = dir.path().join(".editorconfig");
+        std::fs::write(&config, "root=true\n[*.cs]\nindent_style=space\nindent_size=2\n").unwrap();
+        let (wake, frames) = std::sync::mpsc::channel();
+        let waker = rc_core::Waker::new(move || { let _ = wake.send(()); });
+        let mut docs = Docs::with_waker(ParserPool::new(Arc::new(|| {})), waker);
+        docs.open(&file).unwrap();
+        frames.recv_timeout(std::time::Duration::from_secs(5)).unwrap();
+        docs.poll_parses();
+        let editor = &mut docs.list[0].editor;
+        assert_eq!(editor.indent.unit, "  ");
+        assert_eq!(editor.indent.tab_width, 2);
+        assert!(!editor.buffer.is_modified());
+        let edit = rc_text::commands::insert_tab(editor.buffer.rope(), &editor.selection, &editor.indent);
+        editor.apply(edit, rc_text::EditKind::Other);
+        assert!(editor.buffer.to_disk_string().starts_with("  "));
+        editor.undo();
+        std::fs::write(&config, "root=true\n[*.cs]\nindent_style=tab\ntab_width=6\n").unwrap();
+        docs.on_disk_change(&config);
+        frames.recv_timeout(std::time::Duration::from_secs(5)).unwrap();
+        docs.poll_parses();
+        assert_eq!(docs.list[0].editor.indent.unit, "\t");
+        assert_eq!(docs.list[0].editor.indent.tab_width, 6);
+        std::fs::remove_file(&config).unwrap();
+        docs.on_disk_change(&config);
+        frames.recv_timeout(std::time::Duration::from_secs(5)).unwrap();
+        docs.poll_parses();
+        assert_eq!(docs.list[0].editor.indent, docs.list[0].detected_indent);
+    }
 
     #[test]
     fn open_save_keeps_bom_and_crlf_and_closing_activates_the_left_tab() {
