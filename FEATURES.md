@@ -120,7 +120,12 @@ Validation commands: `cargo test -p rc-dotnet --lib`,
 `cargo test -p rc-app sdk_chooser_only_writes_after_explicit_save`, and
 `cargo test -p rc-app -p rc-kit i18n::tests` (include the app to enable Linux window backends).
 
-Remaining: actual SDK build/run verification, editing roll-forward/prerelease policy,
+Real SDK validation: `cargo test -p rc-dotnet --test sdk global_json_selection_controls_the_real_sdk_and_preserves_policies`
+selects installed .NET 8.0.427 and 10.0.403 in turn, checks `dotnet --version` from
+the project directory, and builds a copied Shop.Core project under each SDK. Existing
+roll-forward, prerelease and test-runner fields remain unchanged.
+
+Remaining: editing roll-forward/prerelease policy,
 comment-preserving JSONC edits, effective ancestor policy display and restarting an
 already running Roslyn session when its selected SDK changes. Status remains partial.
 Reference: [Microsoft global.json documentation](https://learn.microsoft.com/en-us/dotnet/core/tools/global-json).
@@ -187,7 +192,7 @@ Source / reuse boundary: `crates/rc-dotnet; crates/rc-core/src/workspace.rs`.
 | B-17 | Project references editor | ⬜ | Implement with integration and UI acceptance evidence. |
 | B-18 | Target frameworks editor | ⬜ | Implement with integration and UI acceptance evidence. |
 | B-19 | Build configurations and platforms | ⬜ | Implement with integration and UI acceptance evidence. |
-| B-20 | global.json SDK management | 🚧 | Workspace SDK chooser implemented; verify real SDK builds and add policy editing / commented JSON support. |
+| B-20 | global.json SDK management | 🚧 | SDK selection and builds verified with .NET 8/10; add policy editing / commented JSON support. |
 | B-21 | .NET workload management | ⬜ | Implement with integration and UI acceptance evidence. |
 | B-22 | NuGet dependency graph | ⬜ | Implement with integration and UI acceptance evidence. |
 | B-23 | Central package management | ⬜ | Implement with integration and UI acceptance evidence. |
