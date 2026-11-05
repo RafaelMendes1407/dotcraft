@@ -621,12 +621,7 @@ fn rename(app: &mut DotCraftApp, ctx: &Context, path: &mut PathBuf, name: &mut S
                 app.explorer.invalidate(path);
                 app.explorer.invalidate(&target);
                 // Open editors follow the file.
-                for d in &mut app.docs.list {
-                    if let Ok(rest) = d.path.strip_prefix(&*path) {
-                        d.path = target.join(rest);
-                        d.editor.path = Some(d.path.clone());
-                    }
-                }
+                app.docs.follow_rename(path, &target);
                 return Outcome::Close;
             }
             Err(e) => {

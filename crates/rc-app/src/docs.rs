@@ -27,6 +27,7 @@ pub struct Doc {
     pub md_view: Option<MdView>,
     detected_indent: rc_text::commands::Indent,
     style_revision: u64,
+    resolved_style: rc_core::editorconfig::Indentation,
 }
 
 /// How a Markdown file is shown (Rider's editor / editor and preview / preview switch).
@@ -44,6 +45,24 @@ impl Doc {
 
     pub fn is_modified(&self) -> bool {
         self.editor.buffer.is_modified()
+    }
+
+    fn apply_style(&mut self) {
+        let base = &self.detected_indent;
+        let style = &self.resolved_style;
+        let tabs = style.tabs.unwrap_or(base.unit == "\t");
+        let size = style.size.unwrap_or_else(|| if base.unit == "\t" { base.tab_width } else { base.unit.len() });
+        self.editor.indent = rc_text::commands::Indent {
+            unit: if tabs { "\t".into() } else { " ".repeat(size) },
+            tab_width: style.tab_width.unwrap_or(base.tab_width),
+        };
+    }
+
+    fn reload(&mut self, text: &str) {
+        self.editor.reload(text);
+        self.detected_indent = rc_editor::state::detect_indent(&self.editor.buffer);
+        // Keep the current configuration effective while its refresh is in flight.
+        self.apply_style();
     }
 }
 
@@ -157,7 +176,7 @@ impl Docs {
         let md_view = path.extension().and_then(|e| e.to_str()).is_some_and(|e| e.eq_ignore_ascii_case("md") || e.eq_ignore_ascii_case("markdown")).then_some(MdView::Split);
         let detected_indent = editor.indent.clone();
         let _ = self.styles.requests.send((id, 0, path.clone()));
-        self.list.push(Doc { detected_indent, style_revision: 0, editor, path: path.clone(), mtime, bom, pinned: false, preview: false, conflict: false, md_view });
+        self.list.push(Doc { detected_indent, style_revision: 0, resolved_style: Default::default(), editor, path: path.clone(), mtime, bom, pinned: false, preview: false, conflict: false, md_view });
         let i = self.list.len() - 1;
         self.activate(i);
         Ok(i)
@@ -260,10 +279,11 @@ impl Docs {
             doc.conflict = true;
             return;
         }
-        doc.editor.reload(&text);
+        doc.reload(&text);
         doc.bom = bom;
         doc.mtime = mtime;
         doc.editor.request_parse(&self.pool);
+        Self::request_style(&self.styles, doc);
     }
 
     /// Checks every open document against the disk (the window got the focus back: catches
@@ -285,19 +305,38 @@ impl Docs {
             doc.conflict = true;
             return Ok(());
         }
-        doc.editor.reload(&text);
+        doc.reload(&text);
         doc.bom = bom;
         doc.mtime = mtime;
         doc.conflict = false;
         doc.editor.request_parse(&self.pool);
+        Self::request_style(&self.styles, doc);
         Ok(())
     }
 
     /// Re-read settings after config changes or focus restoration. Stale results are ignored.
     fn refresh_styles(&mut self) {
         for doc in &mut self.list {
-            doc.style_revision = doc.style_revision.wrapping_add(1);
-            let _ = self.styles.requests.send((doc.editor.id, doc.style_revision, doc.path.clone()));
+            Self::request_style(&self.styles, doc);
+        }
+    }
+
+    fn request_style(worker: &StyleWorker, doc: &mut Doc) {
+        doc.style_revision = doc.style_revision.wrapping_add(1);
+        let _ = worker.requests.send((doc.editor.id, doc.style_revision, doc.path.clone()));
+    }
+
+    /// Open documents follow file/folder renames, including the rules for their new paths.
+    pub fn follow_rename(&mut self, old: &Path, new: &Path) {
+        for doc in &mut self.list {
+            if let Ok(rest) = doc.path.strip_prefix(old) {
+                doc.path = new.join(rest);
+                doc.editor.path = Some(doc.path.clone());
+                doc.resolved_style = Default::default();
+                doc.detected_indent = rc_editor::state::detect_indent(&doc.editor.buffer);
+                doc.apply_style();
+                Self::request_style(&self.styles, doc);
+            }
         }
     }
 
@@ -306,13 +345,8 @@ impl Docs {
         let any = !styles.is_empty();
         for (id, revision, style) in styles {
             let Some(doc) = self.list.iter_mut().find(|d| d.editor.id == id && d.style_revision == revision) else { continue };
-            let base = &doc.detected_indent;
-            let tabs = style.tabs.unwrap_or(base.unit == "\t");
-            let size = style.size.unwrap_or_else(|| if base.unit == "\t" { base.tab_width } else { base.unit.len() });
-            doc.editor.indent = rc_text::commands::Indent {
-                unit: if tabs { "\t".into() } else { " ".repeat(size) },
-                tab_width: style.tab_width.unwrap_or(base.tab_width),
-            };
+            doc.resolved_style = style;
+            doc.apply_style();
         }
         any
     }
@@ -380,6 +414,63 @@ mod tests {
         frames.recv_timeout(std::time::Duration::from_secs(5)).unwrap();
         docs.poll_parses();
         assert_eq!(docs.list[0].editor.indent, docs.list[0].detected_indent);
+    }
+
+    #[test]
+    fn editorconfig_survives_reload_and_renames_and_restores_the_new_disk_baseline() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("App.cs");
+        let renamed = dir.path().join("App.json");
+        let config = dir.path().join(".editorconfig");
+        std::fs::write(&file, "class App {\n    int value;\n}\n").unwrap();
+        std::fs::write(&config, "root=true\n[*.cs]\nindent_style=space\nindent_size=2\n[*.json]\nindent_style=tab\ntab_width=3\n").unwrap();
+        let (wake, frames) = std::sync::mpsc::channel();
+        let waker = rc_core::Waker::new(move || { let _ = wake.send(()); });
+        let mut docs = Docs::with_waker(ParserPool::new(Arc::new(|| {})), waker);
+        let settle = |docs: &mut Docs| {
+            frames.recv_timeout(std::time::Duration::from_secs(5)).unwrap();
+            docs.poll_parses();
+        };
+        docs.open(&file).unwrap();
+        settle(&mut docs);
+        assert_eq!(docs.list[0].editor.indent.unit, "  ");
+
+        // Automatic reload changes the detected baseline to tabs, but configured spaces win.
+        std::fs::write(&file, "class App {\n\tint changed;\n}\n").unwrap();
+        let later = SystemTime::now() + std::time::Duration::from_secs(5);
+        std::fs::File::options().write(true).open(&file).unwrap().set_modified(later).unwrap();
+        docs.on_disk_change(&file);
+        assert_eq!(docs.list[0].detected_indent.unit, "\t");
+        assert_eq!(docs.list[0].editor.indent.unit, "  ");
+        settle(&mut docs);
+        assert_eq!(docs.list[0].editor.indent.unit, "  ");
+        std::fs::remove_file(&config).unwrap();
+        docs.on_disk_change(&config);
+        settle(&mut docs);
+        assert_eq!(docs.list[0].editor.indent.unit, "\t");
+
+        std::fs::write(&config, "root=true\n[*.cs]\nindent_style=space\nindent_size=2\n[*.json]\nindent_style=tab\ntab_width=3\n").unwrap();
+        docs.on_disk_change(&config);
+        settle(&mut docs);
+        // Explicit reload changes the baseline back to four spaces without dropping rules.
+        std::fs::write(&file, "class App {\n    int explicit;\n}\n").unwrap();
+        docs.reload_from_disk(0).unwrap();
+        assert_eq!(docs.list[0].detected_indent.unit, "    ");
+        assert_eq!(docs.list[0].editor.indent.unit, "  ");
+        settle(&mut docs);
+        assert_eq!(docs.list[0].editor.indent.unit, "  ");
+
+        std::fs::rename(&file, &renamed).unwrap();
+        docs.follow_rename(&file, &renamed);
+        settle(&mut docs);
+        assert_eq!(docs.list[0].path, renamed);
+        assert_eq!(docs.list[0].editor.indent.unit, "\t");
+        assert_eq!(docs.list[0].editor.indent.tab_width, 3);
+        std::fs::remove_file(&config).unwrap();
+        docs.on_disk_change(&config);
+        settle(&mut docs);
+        assert_eq!(docs.list[0].editor.indent.unit, "    ");
+        assert!(!docs.list[0].is_modified());
     }
 
     #[test]

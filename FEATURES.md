@@ -84,7 +84,9 @@ solution root need a separate watcher/search-root audit.
 C-18 resolves `indent_style`, `indent_size` (including `tab`) and `tab_width` for each
 opened document on a dedicated background worker. Ancestor files and ordered sections
 are merged with `root=true` and `unset` support. Config changes and focus restoration
-refresh open documents; removed rules restore detected indentation. Stale results cannot
+refresh open documents; removed rules restore detected indentation. Automatic and manual
+reloads refresh the detected baseline while retaining configured indentation; file and
+folder renames resolve rules for the new path. Stale results cannot
 change a closed document or overwrite a newer request. Tabs and spaces affect editor
 commands and existing Roslyn formatting request options without rewriting file contents.
 
@@ -96,7 +98,7 @@ cancellation and oversized inputs; a real Shop C# source verifies Tab editing, u
 configuration updates and removal through the document lifecycle.
 
 Validation: `cargo test -p rc-core --lib` (9 passed) and
-`cargo test -p rc-app docs::tests` (5 passed).
+`cargo test -p rc-app docs::tests` (6 passed).
 Specification reference: [EditorConfig](https://editorconfig.org/).
 Remaining: save-time charset/newline/whitespace properties, numeric-range globs,
 formatting option audit and graphical acceptance. C-18 remains partial.
