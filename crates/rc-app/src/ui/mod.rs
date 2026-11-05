@@ -3,6 +3,7 @@
 
 pub mod debug_window;
 pub mod dialogs;
+pub mod sdk_selection;
 pub mod editor_area;
 pub mod explorer;
 pub mod git;

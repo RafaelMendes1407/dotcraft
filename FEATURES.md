@@ -23,10 +23,10 @@ A source implementation or passing parser test alone does not establish Rider pa
 | Status | Items |
 | --- | --- |
 | ✅ Verified | 1 |
-| 🚧 In progress | 1 |
+| 🚧 In progress | 2 |
 | 🟢 Existing | 104 |
 | 🔁 Reuse candidate | 33 |
-| ⬜ Backlog | 234 |
+| ⬜ Backlog | 233 |
 | 🚫 Out of scope | 0 |
 | **Total** | **373** |
 <!-- summary:end -->
@@ -92,6 +92,44 @@ all four pages at 1280×800, 800×500, 800×300, 640×400 and 480×320 logical p
 stable width and height, verify tool Browse buttons remain visible with long paths, exercise the compact category selector, and confirm Cancel
 discards draft edits. Native file-picker lifecycle is unchanged by this layout feature.
 
+### B-20: workspace SDK selection
+
+Settings > Tools > Manage project SDK opens a chooser that discovers installed SDKs
+on a background task (10-second timeout; closing cancels discovery). Saving is an
+explicit action that creates or updates `global.json` in the displayed workspace root.
+It changes only `sdk.version`, preserves SDK policies and unrelated JSON fields, and
+uses an atomic replacement. A best-effort snapshot check detects edits present before
+saving; it is not a lock against concurrent writers. It refuses malformed/commented JSON, stale snapshots and
+symlinked policy files. Ancestor policies are never modified; a new workspace policy
+shadows them. Existing CLI operations continue to resolve SDKs through `global.json`.
+Closing or saving the SDK chooser returns to the original Tools Settings draft;
+it preserves edits to global settings without applying them. Cancel still discards
+that draft. A UI regression types a CLI path, then exercises both Close and Save
+and verifies the restored page, draft contents and unapplied global settings.
+The SDK chooser saves independently of the global Settings draft. Its body scrolls
+while Save and Close remain outside the scroll area. Long paths are truncated with
+the complete path available on hover. Compact-window tests cover 480×320 and 800×300
+with long workspace paths and diagnostics, including a successful Save interaction.
+
+Backend tests cover an actual Shop.Api project, preserving roll-forward, prerelease,
+SDK paths, MSBuild SDK mappings and test runner fields, invalid input, stale files,
+symlinks, ancestor isolation and cancellation. A headless chooser regression uses a
+controlled CLI executable to verify that discovery does not write a policy and that
+Save creates the selected pin. This executable is a test double, not SDK validation.
+Validation commands: `cargo test -p rc-dotnet --lib`,
+`cargo test -p rc-app sdk_chooser_only_writes_after_explicit_save`, and
+`cargo test -p rc-app -p rc-kit i18n::tests` (include the app to enable Linux window backends).
+
+Real SDK validation: `cargo test -p rc-dotnet --test sdk global_json_selection_controls_the_real_sdk_and_preserves_policies`
+selects installed .NET 8.0.427 and 10.0.403 in turn, checks `dotnet --version` from
+the project directory, and builds a copied Shop.Core project under each SDK. Existing
+roll-forward, prerelease and test-runner fields remain unchanged.
+
+Remaining: editing roll-forward/prerelease policy,
+comment-preserving JSONC edits, effective ancestor policy display and restarting an
+already running Roslyn session when its selected SDK changes. Status remains partial.
+Reference: [Microsoft global.json documentation](https://learn.microsoft.com/en-us/dotnet/core/tools/global-json).
+
 ## A. Desktop interface and workflow
 
 Source / reuse boundary: `crates/rc-app/src/ui; crates/rc-kit`.
@@ -154,7 +192,7 @@ Source / reuse boundary: `crates/rc-dotnet; crates/rc-core/src/workspace.rs`.
 | B-17 | Project references editor | ⬜ | Implement with integration and UI acceptance evidence. |
 | B-18 | Target frameworks editor | ⬜ | Implement with integration and UI acceptance evidence. |
 | B-19 | Build configurations and platforms | ⬜ | Implement with integration and UI acceptance evidence. |
-| B-20 | global.json SDK management | ⬜ | Implement with integration and UI acceptance evidence. |
+| B-20 | global.json SDK management | 🚧 | SDK selection and builds verified with .NET 8/10; add policy editing / commented JSON support. |
 | B-21 | .NET workload management | ⬜ | Implement with integration and UI acceptance evidence. |
 | B-22 | NuGet dependency graph | ⬜ | Implement with integration and UI acceptance evidence. |
 | B-23 | Central package management | ⬜ | Implement with integration and UI acceptance evidence. |
