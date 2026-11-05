@@ -98,10 +98,14 @@ Settings > Tools > Manage project SDK opens a chooser that discovers installed S
 on a background task (10-second timeout; closing cancels discovery). Saving is an
 explicit action that creates or updates `global.json` in the displayed workspace root.
 It changes only `sdk.version`, preserves SDK policies and unrelated JSON fields, and
-uses an atomic replacement. It refuses malformed/commented JSON, stale snapshots and
+uses an atomic replacement. A best-effort snapshot check detects edits present before
+saving; it is not a lock against concurrent writers. It refuses malformed/commented JSON, stale snapshots and
 symlinked policy files. Ancestor policies are never modified; a new workspace policy
 shadows them. Existing CLI operations continue to resolve SDKs through `global.json`.
-The SDK chooser saves independently of the global Settings draft.
+The SDK chooser saves independently of the global Settings draft. Its body scrolls
+while Save and Close remain outside the scroll area. Long paths are truncated with
+the complete path available on hover. Compact-window tests cover 480×320 and 800×300
+with long workspace paths and diagnostics, including a successful Save interaction.
 
 Backend tests cover an actual Shop.Api project, preserving roll-forward, prerelease,
 SDK paths, MSBuild SDK mappings and test runner fields, invalid input, stale files,

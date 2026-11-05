@@ -297,12 +297,7 @@ fn settings_tools(ui: &mut Ui, draft: &mut Settings, app: &mut DotCraftApp) {
 }
 
 fn sdk_selection(ctx: &Context, state: &mut crate::ui::sdk_selection::SdkSelection) -> Outcome {
-    let width = (ctx.content_rect().width() - 48.0).clamp(200.0, 520.0);
-    let ((close, can_close), esc) = modal(ctx, "sdk_selection", width, |ui| {
-        title(ui, tr("Project SDK"));
-        state.contents(ui)
-    });
-    if close || (esc && can_close) { Outcome::Close } else { Outcome::Keep }
+    if state.show(ctx) { Outcome::Close } else { Outcome::Keep }
 }
 
 fn lang_code(l: Lang) -> &'static str {
