@@ -8,6 +8,7 @@ mod item_templates;
 mod runner;
 mod search;
 mod vcs;
+mod http_client;
 #[cfg(test)]
 mod vcs_tests;
 #[cfg(test)]

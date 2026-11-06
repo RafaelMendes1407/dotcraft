@@ -59,6 +59,7 @@ pub struct DotCraftApp {
     window_title: String,
     pub files: crate::search::Files,
     pub vcs: crate::vcs::Vcs,
+    pub http: crate::http_client::HttpClient,
     pub nuget: crate::ui::nuget::NugetManager,
     pub split: Option<Split>,
     /// Documents shown in windows of their own (editor ids).
@@ -143,6 +144,7 @@ impl DotCraftApp {
             window_title: String::new(),
             files: crate::search::Files::new(),
             vcs: crate::vcs::Vcs::new(waker.clone()),
+            http: crate::http_client::HttpClient::new(waker.clone()),
             nuget: crate::ui::nuget::NugetManager::new(waker.clone()),
             split: None,
             floating: Vec::new(),
@@ -305,6 +307,7 @@ impl DotCraftApp {
         self.runner.clear();
         self.files.close();
         self.vcs.close();
+        self.http = crate::http_client::HttpClient::new(self.waker.clone());
         self.find_in_files = None;
         self.search_everywhere = None;
         self.find_bar = None;
@@ -1305,6 +1308,7 @@ impl eframe::App for DotCraftApp {
         for n in self.vcs.update(&mut self.docs, dark) {
             self.notify(n, false);
         }
+        self.http.update();
         crate::ui::frame(self, ui, editor_actions);
         self.docs.reparse_edited();
         let now = ctx.input(|i| i.time);
