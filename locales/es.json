@@ -218,7 +218,8 @@
     "Reload from Disk": "Recargar desde disco",
     "Open Recent": "Abrir reciente",
     "Clear Recent": "Borrar recientes",
-    "No Recent Items": "No hay elementos recientes"
+    "No Recent Items": "No hay elementos recientes",
+    "Search files, types, symbols, actions and settings": "Search files, types, symbols, actions and settings"
   },
   "terminal": {
     "Local": "Local",
