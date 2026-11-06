@@ -218,7 +218,8 @@
     "Reload from Disk": "Wczytaj ponownie z dysku",
     "Open Recent": "Otwórz ostatnie",
     "Clear Recent": "Wyczyść ostatnie",
-    "No Recent Items": "Brak ostatnich elementów"
+    "No Recent Items": "Brak ostatnich elementów",
+    "Search files, types, symbols, actions and settings": "Search files, types, symbols, actions and settings"
   },
   "terminal": {
     "Local": "Lokalny",
