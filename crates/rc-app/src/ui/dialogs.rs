@@ -20,6 +20,7 @@ pub enum SettingsPage {
 pub enum Dialog {
     Settings { draft: Box<Settings>, page: SettingsPage },
     About,
+    AttachProcess { pid: String, focus: bool },
     GotoLine { text: String, focus: bool },
     NewFile { dir: PathBuf, name: String, kind: crate::item_templates::ItemKind, error: Option<String> },
     Rename { path: PathBuf, name: String, error: Option<String> },
@@ -62,6 +63,7 @@ pub fn show(app: &mut DotCraftApp, ctx: &Context) {
     let outcome = match &mut dialog {
         Dialog::Settings { draft, page } => settings(app, ctx, draft, page),
         Dialog::About => about(ctx),
+        Dialog::AttachProcess { pid, focus } => attach_process(app, ctx, pid, focus),
         Dialog::GotoLine { text, focus } => goto_line(app, ctx, text, focus),
         Dialog::NewFile { dir, name, kind, error } => new_file(app, ctx, dir, name, *kind, error),
         Dialog::Rename { path, name, error } => rename(app, ctx, path, name, error),
@@ -991,3 +993,59 @@ mod tests {
         assert!(s.contains("public class Order"));
     }
 }
+
+/// Accept a decimal PID; exclude the IDE itself to avoid self-debugging deadlocks.
+fn attach_pid(text: &str) -> Option<u32> {
+    let text = text.trim();
+    if text.is_empty() || !text.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    text.parse::<u32>().ok().filter(|&pid| pid != 0 && pid != std::process::id())
+}
+
+fn attach_process(app: &mut DotCraftApp, ctx: &Context, text: &mut String, focus: &mut bool) -> Outcome {
+    let pid = attach_pid(text);
+    let available = !app.debugger.active() && app.debugger.downloading.is_none();
+    let mut enter = false;
+    let ((attach, cancel), esc) = modal(ctx, "attach_process", 460.0, |ui| {
+        title(ui, tr("Attach to Process…"));
+        ui.label(tr("Attach to a running .NET process by its process ID."));
+        ui.label(tr("Stopping debugging detaches and leaves the process running."));
+        ui.add_space(8.0);
+        let response = ui.add(egui::TextEdit::singleline(text).hint_text(tr("Process ID")).desired_width(f32::INFINITY));
+        if std::mem::take(focus) {
+            response.request_focus();
+        }
+        enter = response.has_focus() && ui.input(|i| i.key_pressed(Key::Enter));
+        if !available {
+            ui.label(tr("Stop the current debug session before attaching"));
+        } else if !text.is_empty() && pid.is_none() {
+            ui.colored_label(rc_kit::pal(ui).error, tr("Enter a positive process ID other than DotCraft's own process"));
+        }
+        buttons(ui, tr("Attach"), pid.is_some() && available)
+    });
+    if cancel || esc {
+        return Outcome::Close;
+    }
+    // Parse after the input widget updates the text, including Enter in the same frame.
+    if (attach || enter) && available && let Some(pid) = attach_pid(text) {
+        let outputs = app.debugger.attach(pid, app.settings.netcoredbg_path.as_deref(), &app.docs);
+        app.handle_debug(outputs);
+        return Outcome::Close;
+    }
+    Outcome::Keep
+}
+
+#[cfg(test)]
+mod attach_tests {
+    use super::attach_pid;
+
+    #[test]
+    fn validates_external_process_ids() {
+        assert_eq!(attach_pid(" 42 "), Some(42).filter(|&pid| pid != std::process::id()));
+        for text in ["", "0", "-1", "+1", "1.5", "42abc", "4294967296", &std::process::id().to_string()] {
+            assert_eq!(attach_pid(text), None, "{text}");
+        }
+    }
+}
+

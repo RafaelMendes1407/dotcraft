@@ -1,0 +1,33 @@
+# Attach to a running process
+
+Use Attach to Process from Search Everywhere, the run configuration menu, or the native Run menu. Enter the decimal process ID of an existing .NET process. DotCraft rejects zero, malformed IDs, its own PID, and attempts to replace an active debug session. No build or application launch is required. Restart is disabled for attached sessions so it cannot launch an unrelated run configuration.
+
+The existing netcoredbg adapter is located or downloaded on first use. Attachment preserves watches and resets previous session presentation state. Stop disconnects the debugger from an attached process rather than terminating that process.
+
+Closing or switching workspaces stops the debugger and cancels deferred attachment. Stop is available in both toolbars while an adapter download is pending; cancellation discards queued completion events so an old download cannot start a new session afterward.
+
+## Validation
+
+```sh
+cargo test -p rc-app attach_ --offline
+cargo test -p rc-app validates_external_process_ids --offline
+cargo test -p rc-app debugger::tests --offline
+cargo test -p rc-app restart_is_disabled_for_attach_sessions_and_available_for_launches --offline
+cargo test -p rc-app -p rc-kit every_text_in_the_code_has_a_translation --offline
+```
+
+The attach action, invalid PID rejection, PID parsing, workspace closure, stale download events, Stop interactions, and attach-versus-launch Restart behavior have passed targeted tests. The attach action also compiles independently from the parallel HTTP, web, stash, settings, and stripe changes.
+
+The live regression requires an installed .NET 8 SDK, netcoredbg, and restored fixture dependencies:
+
+```sh
+cargo test -p rc-app attaches_from_the_ide_and_stop_leaves_the_target_running -- --ignored --nocapture
+```
+
+It builds and starts the sample ASP.NET application, attaches from the IDE, stops debugging, waits for the adapter to exit, and verifies the target still serves an HTTP request. Live verification is pending network access for adapter download and NuGet restore. The test stays explicitly ignored for hosts without these prerequisites.
+
+## Scope
+
+PID entry is supported; a process browser, remote process attachment, and automatic runtime filtering are separate tasks. OS process permissions and netcoredbg runtime compatibility still apply. This does not establish debugging support for every .NET runtime or host platform.
+
+Implementation reuses DotCraft's existing DAP attach backend and first-use adapter installation. New UI strings use English source text and explicit English locale fallbacks in `scripts/i18n/attach-process.tsv`.
