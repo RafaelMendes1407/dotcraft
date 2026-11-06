@@ -128,13 +128,15 @@ mod tests {
     fn overflowing_stripes_scroll_to_and_toggle_the_last_tool() {
         let _lock = crate::screens::HOME_LOCK.lock().unwrap_or_else(|error| error.into_inner());
         let home = tempfile::tempdir().unwrap();
-        for (side, last) in [(Side::Left, ToolWindow::Nuget), (Side::Right, ToolWindow::Notifications)] {
+        for side in [Side::Left, Side::Right] {
             let mut app = crate::screens::test_app(home.path(), true);
             if side == Side::Right {
                 for window in ToolWindow::ALL {
                     app.dock.move_to(window, side);
                 }
             }
+            let last_side = if side == Side::Left { Side::Bottom } else { side };
+            let last = ToolWindow::ALL.into_iter().filter(|window| app.dock.side_of(*window) == last_side).last().unwrap();
             let mut harness = Harness::builder().with_size(vec2(42.0, 120.0)).build_ui_state(
                 move |ui, app: &mut DotCraftApp| show(app, ui, side),
                 app,
@@ -148,12 +150,12 @@ mod tests {
                 modifiers: egui::Modifiers::NONE,
             });
             harness.run_steps(20);
-            let target = harness.get_by_label(last.title());
+            let target = harness.get_by_role_and_label(egui::accesskit::Role::Button, last.title());
             assert!(target.rect().top() >= 0.0 && target.rect().bottom() <= 120.0, "last tool must be visible after scrolling: {:?}", target.rect());
             target.click();
             harness.run_steps(2);
             assert!(harness.state().dock.is_open(last), "last tool must be reachable on {side:?}");
-            harness.get_by_label(last.title()).click();
+            harness.get_by_role_and_label(egui::accesskit::Role::Button, last.title()).click();
             harness.run_steps(2);
             assert!(!harness.state().dock.is_open(last));
         }
