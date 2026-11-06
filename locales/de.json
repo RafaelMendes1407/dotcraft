@@ -218,7 +218,8 @@
     "Reload from Disk": "Vom Datenträger neu laden",
     "Open Recent": "Zuletzt geöffnet",
     "Clear Recent": "Liste löschen",
-    "No Recent Items": "Keine zuletzt geöffneten Objekte"
+    "No Recent Items": "Keine zuletzt geöffneten Objekte",
+    "Workspace edits that create, rename, or delete files are not supported. No changes were applied.": "Workspace edits that create, rename, or delete files are not supported. No changes were applied."
   },
   "terminal": {
     "Local": "Lokal",
