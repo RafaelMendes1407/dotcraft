@@ -43,3 +43,34 @@ fn web_comments_and_razor_detection_remain_distinct() {
         assert_eq!(lang.block_comment(), Some(("/*", "*/")));
     }
 }
+
+#[test]
+fn jsx_and_tsx_highlight_components_attributes_comments_and_constants() {
+    for (file, lang) in [("view.jsx", Lang::JavaScript), ("view.tsx", Lang::Tsx)] {
+        let source = "const view = <Panel title=\"Hello\" enabled={true}>\n  {/* explanation */}\n  <span data-kind=\"item\" />\n  <UI.Badge count={42} />\n</Panel>;\n";
+        let rope = Rope::from_str(source);
+        let tree = parse_now(lang, &rope, None).unwrap();
+        assert!(!tree.root_node().has_error(), "{file}: {}", tree.root_node().to_sexp());
+        let highlights = highlight_lines(lang, &tree, &rope, 0, rope.len_lines());
+        for (token, role) in [
+            ("Panel", Hl::Tag),
+            ("span", Hl::Tag),
+            ("Badge", Hl::Tag),
+            ("title", Hl::XmlAttr),
+            ("enabled", Hl::XmlAttr),
+            ("data-kind", Hl::XmlAttr),
+            ("count", Hl::XmlAttr),
+            ("\"Hello\"", Hl::String),
+            ("true", Hl::Constant),
+            ("42", Hl::Number),
+            ("/* explanation */", Hl::Comment),
+        ] {
+            assert!(highlights.iter().enumerate().any(|(line, spans)| spans.iter().any(|span| {
+                span.hl == role && rope.line(line).chars().skip(span.start).take(span.end - span.start).collect::<String>() == token
+            })), "{file}: missing {role:?} for {token}");
+        }
+        assert_eq!(highlights.iter().enumerate().map(|(line, spans)| spans.iter().filter(|span| {
+            span.hl == Hl::Tag && rope.line(line).chars().skip(span.start).take(span.end - span.start).collect::<String>() == "Panel"
+        }).count()).sum::<usize>(), 2, "both component tags must be styled in {file}");
+    }
+}

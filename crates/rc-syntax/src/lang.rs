@@ -104,7 +104,9 @@ impl Lang {
         static JS: OnceLock<Query> = OnceLock::new();
         static TS: OnceLock<Query> = OnceLock::new();
         static TSX: OnceLock<Query> = OnceLock::new();
+        static JS_SOURCE: OnceLock<String> = OnceLock::new();
         static TS_SOURCE: OnceLock<String> = OnceLock::new();
+        static TSX_SOURCE: OnceLock<String> = OnceLock::new();
         static CS: OnceLock<Query> = OnceLock::new();
         static XML: OnceLock<Query> = OnceLock::new();
         static JSON: OnceLock<Query> = OnceLock::new();
@@ -115,8 +117,9 @@ impl Lang {
         let (cell, source) = match self {
             Lang::Html => (&HTML, include_str!("../queries/html.scm")),
             Lang::Css => (&CSS, include_str!("../queries/css.scm")),
-            Lang::JavaScript => (&JS, include_str!("../queries/javascript.scm")),
-            Lang::TypeScript | Lang::Tsx => (if self == Lang::Tsx { &TSX } else { &TS }, TS_SOURCE.get_or_init(|| format!("{}\n{}", include_str!("../queries/javascript.scm"), include_str!("../queries/typescript.scm"))).as_str()),
+            Lang::JavaScript => (&JS, JS_SOURCE.get_or_init(|| format!("{}\n{}", include_str!("../queries/javascript.scm"), include_str!("../queries/jsx.scm"))).as_str()),
+            Lang::TypeScript => (&TS, TS_SOURCE.get_or_init(|| format!("{}\n{}", include_str!("../queries/javascript.scm"), include_str!("../queries/typescript.scm"))).as_str()),
+            Lang::Tsx => (&TSX, TSX_SOURCE.get_or_init(|| format!("{}\n{}\n{}", include_str!("../queries/javascript.scm"), include_str!("../queries/typescript.scm"), include_str!("../queries/jsx.scm"))).as_str()),
             Lang::CSharp => (&CS, include_str!("../queries/csharp.scm")),
             Lang::Xml => (&XML, include_str!("../queries/xml.scm")),
             Lang::Json => (&JSON, include_str!("../queries/json.scm")),
