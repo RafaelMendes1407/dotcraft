@@ -12,6 +12,7 @@ Closing or switching workspaces stops the debugger and cancels deferred attachme
 cargo test -p rc-app attach_ --offline
 cargo test -p rc-app validates_external_process_ids --offline
 cargo test -p rc-app debugger::tests --offline
+cargo test -p rc-dap --lib --offline
 cargo test -p rc-app restart_is_disabled_for_attach_sessions_and_available_for_launches --offline
 cargo test -p rc-app -p rc-kit every_text_in_the_code_has_a_translation --offline
 ```
@@ -25,6 +26,8 @@ cargo test -p rc-app attaches_from_the_ide_and_stop_leaves_the_target_running --
 ```
 
 It builds and starts the sample ASP.NET application, attaches from the IDE, stops debugging, waits for the adapter to exit, and verifies the target still serves an HTTP request. Live verification passed with .NET SDK 8.0.427, ASP.NET runtime 8.0.33, and the downloaded netcoredbg adapter: one test passed in 4.63 seconds, including the HTTP 200 response after detaching. Dependencies were restored using temporary SDK, CLI-home, and NuGet directories under `/tmp`. The test stays explicitly ignored for hosts without these prerequisites.
+
+The existing live `debugs_the_cli_and_the_api_from_the_ide` regression also passed, exercising conditional breakpoints, Step Over, Run to Cursor, values, watches, evaluation, hover values, and the API launch path. The DAP unit suite passes 18 tests. Its fake-adapter log reader accepts only newline-completed records; a regression verifies that a partially appended record cannot cause a JSON parse race.
 
 ## Scope
 
