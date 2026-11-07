@@ -77,7 +77,7 @@ A headless application regression also renders the real explorer with the filter
 TenProjects solution and checks that selected modules appear and excluded modules do not.
 Verification: `cargo test -p rc-app solution_filter_explorer_shows_only_selected_real_projects`.
 Remaining: real SDK build/test execution, Roslyn behavior
-with filters, interactive editing, and dependency-loading behavior. B-14 remains 🚧.
+with filters, interactive editing, and dependency-loading behavior. B-14 remains 🚧. Additional independent evidence and remaining scope are recorded in [solution filter implementation](docs/implementation/solution-filters.md).
 The existing workspace root stays the filter directory; filters stored outside the
 solution root need a separate watcher/search-root audit.
 
