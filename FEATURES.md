@@ -199,7 +199,7 @@ Source / reuse boundary: `crates/rc-editor; crates/rc-text; crates/rc-syntax; cr
 | C-15 | Diagnostics in editor | 🟢 | Exercise on a real .NET fixture; record evidence. |
 | C-16 | Large-file safeguards | 🔁 | Inspect sibling implementation, adapt and verify in .NET. |
 | C-17 | Complete statement | 🔁 | Inspect sibling implementation, adapt and verify in .NET. |
-| C-18 | EditorConfig integration | 🚧 | Per-file indentation implemented and tested; save-time properties and numeric-range globs remain. |
+| C-18 | EditorConfig integration | 🚧 | Indentation subset verified: 10 core, 26 text, 8 document tests plus editor regressions; full conformance remains pending. |
 | C-19 | Spelling assistance | 🔁 | Inspect sibling implementation, adapt and verify in .NET. |
 | C-20 | Web language editor improvements | 🔁 | Inspect sibling implementation, adapt and verify in .NET. |
 | C-21 | Smart and type-matching completion | ⬜ | Implement with integration and UI acceptance evidence. |
@@ -559,3 +559,7 @@ Source / reuse boundary: `crates/rc-term; crates/rc-core; CrabCraft shared modul
 | L-26 | Crash reporting controls | ⬜ | Implement with integration and UI acceptance evidence. |
 | L-27 | Offline tool installation | ⬜ | Implement with integration and UI acceptance evidence. |
 | L-28 | Platform packaging verification | ⬜ | Implement with integration and UI acceptance evidence. |
+
+## EditorConfig indentation validation
+
+The original per-file integration now handles embedded globstars and logical mixed indentation, including indentation narrower than a tab stop and indent_size=tab with an implicit editor tab width. Final exact-snapshot validation passed with --locked --offline in a dedicated target: 10 core tests, 26 text tests, 8 document tests, and application/editor mixed-indentation regressions. No unrelated feature source or dependency changes were included. See [EditorConfig implementation evidence](docs/implementation/editorconfig.md). Numeric-range globs, save-time properties, and full-document JSON/XML mixed-indentation formatting remain pending.

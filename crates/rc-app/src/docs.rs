@@ -50,11 +50,13 @@ impl Doc {
     fn apply_style(&mut self) {
         let base = &self.detected_indent;
         let style = &self.resolved_style;
-        let tabs = style.tabs.unwrap_or(base.unit == "\t");
-        let size = style.size.unwrap_or_else(|| if base.unit == "\t" { base.tab_width } else { base.unit.len() });
+        let tabs = style.tabs.unwrap_or(base.uses_tabs());
+        let tab_width = style.tab_width.unwrap_or(base.tab_width).max(1);
+        let size = style.size.unwrap_or_else(|| if tabs || style.size_uses_tab_width { tab_width } else { base.width() });
         self.editor.indent = rc_text::commands::Indent {
-            unit: if tabs { "\t".into() } else { " ".repeat(size) },
-            tab_width: style.tab_width.unwrap_or(base.tab_width),
+            unit: if tabs { format!("{}{}", "\t".repeat(size / tab_width), " ".repeat(size % tab_width)) } else { " ".repeat(size) },
+            tab_width,
+            prefer_tabs: tabs,
         };
     }
 
@@ -380,6 +382,62 @@ impl Docs {
 mod tests {
     use super::*;
     use std::sync::Arc;
+
+    #[test]
+    fn editorconfig_tab_sized_spaces_use_the_editor_tab_width() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("App.cs");
+        std::fs::write(&path, "class App {\n  int value;\n}\n").unwrap();
+        std::fs::write(dir.path().join(".editorconfig"), "root=true\n[*.cs]\nindent_style=space\nindent_size=tab\n").unwrap();
+        let (wake, frames) = std::sync::mpsc::channel();
+        let mut docs = Docs::with_waker(ParserPool::new(Arc::new(|| {})), rc_core::Waker::new(move || { let _ = wake.send(()); }));
+        docs.open(&path).unwrap();
+        frames.recv_timeout(std::time::Duration::from_secs(5)).unwrap();
+        docs.poll_parses();
+        let editor = &mut docs.list[0].editor;
+        assert_eq!(editor.indent.tab_width, 4);
+        assert_eq!(editor.indent.unit, "    ");
+        assert!(!editor.indent.uses_tabs());
+        assert!(!editor.buffer.is_modified());
+        let edit = rc_text::commands::insert_tab(editor.buffer.rope(), &editor.selection, &editor.indent);
+        editor.apply(edit, rc_text::EditKind::Other);
+        assert!(editor.buffer.rope().to_string().starts_with("    class"));
+        editor.undo();
+        assert!(!editor.buffer.is_modified());
+    }
+
+    #[test]
+    fn editorconfig_mixed_indent_sizes_drive_newline_tab_and_undo() {
+        for (size, width, expected) in [(4, 3, "\t "), (5, 2, "\t\t "), (6, 3, "\t\t"), (2, 4, "  ")] {
+            let dir = tempfile::tempdir().unwrap();
+            let path = dir.path().join("App.cs");
+            std::fs::write(&path, "class App {}\n").unwrap();
+            std::fs::write(dir.path().join(".editorconfig"), format!("root=true\n[*.cs]\nindent_style=tab\nindent_size={size}\ntab_width={width}\n")).unwrap();
+            let (wake, frames) = std::sync::mpsc::channel();
+            let waker = rc_core::Waker::new(move || { let _ = wake.send(()); });
+            let mut docs = Docs::with_waker(ParserPool::new(Arc::new(|| {})), waker);
+            docs.open(&path).unwrap();
+            frames.recv_timeout(std::time::Duration::from_secs(5)).unwrap();
+            docs.poll_parses();
+            let editor = &mut docs.list[0].editor;
+            assert_eq!(editor.indent.unit, expected);
+            assert_eq!(editor.indent.width(), size);
+            assert_eq!(editor.indent.tab_width, width);
+            assert!(editor.indent.prefer_tabs);
+            let edit = rc_text::commands::insert_tab(editor.buffer.rope(), &editor.selection, &editor.indent);
+            editor.apply(edit, rc_text::EditKind::Other);
+            assert!(editor.buffer.rope().to_string().starts_with(expected));
+            editor.undo();
+            assert_eq!(editor.buffer.rope().to_string(), "class App {}\n");
+            assert!(!editor.buffer.is_modified());
+            editor.selection = rc_text::Selection::point(11);
+            let edit = rc_text::commands::newline(editor.buffer.rope(), &editor.selection, &editor.indent);
+            editor.apply(edit, rc_text::EditKind::Other);
+            assert_eq!(editor.buffer.rope().to_string(), format!("class App {{\n{expected}\n}}\n"));
+            editor.undo();
+            assert_eq!(editor.buffer.rope().to_string(), "class App {}\n");
+        }
+    }
 
     #[test]
     fn editorconfig_drives_real_csharp_edits_and_refreshes_without_dirtying_documents() {
