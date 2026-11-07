@@ -6,6 +6,7 @@
     "Minimize": "Minimalizuj"
   },
   "app": {
+    "Open a project before attaching to a process": "Open a project before attaching to a process",
     " columns": " kolumn",
     "(not found)": "(nie znaleziono)",
     ".NET CLI": ".NET CLI",
@@ -218,7 +219,16 @@
     "Reload from Disk": "Wczytaj ponownie z dysku",
     "Open Recent": "Otwórz ostatnie",
     "Clear Recent": "Wyczyść ostatnie",
-    "No Recent Items": "Brak ostatnich elementów"
+    "No Recent Items": "Brak ostatnich elementów",
+    "Attach to Process…": "Attach to Process…",
+    "Attach": "Attach",
+    "Process ID": "Process ID",
+    "Attach to a running .NET process by its process ID.": "Attach to a running .NET process by its process ID.",
+    "Stopping debugging detaches and leaves the process running.": "Stopping debugging detaches and leaves the process running.",
+    "Enter a positive process ID other than DotCraft's own process": "Enter a positive process ID other than DotCraft's own process",
+    "Stop the current debug session before attaching": "Stop the current debug session before attaching",
+    "Process {pid}": "Process {pid}",
+    "Attaching to process {pid}…": "Attaching to process {pid}…"
   },
   "terminal": {
     "Local": "Lokalny",

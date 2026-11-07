@@ -110,6 +110,7 @@ pub fn action_items() -> Vec<(&'static str, Action)> {
         (tr("Build Solution"), Build),
         (tr("Run"), Run),
         (tr("Debug"), Debug),
+        (tr("Attach to Process…"), AttachProcess),
         (tr("Stop"), StopRun),
         (tr("Run Tests"), RunTests),
         (tr("Settings…"), ShowSettings),

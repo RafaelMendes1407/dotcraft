@@ -6,6 +6,7 @@
     "Minimize": "最小化"
   },
   "app": {
+    "Open a project before attaching to a process": "Open a project before attaching to a process",
     " columns": " 列",
     "(not found)": "(未找到)",
     ".NET CLI": ".NET CLI",
@@ -218,7 +219,16 @@
     "Reload from Disk": "从磁盘重新加载",
     "Open Recent": "打开最近",
     "Clear Recent": "清除最近项目",
-    "No Recent Items": "没有最近项目"
+    "No Recent Items": "没有最近项目",
+    "Attach to Process…": "Attach to Process…",
+    "Attach": "Attach",
+    "Process ID": "Process ID",
+    "Attach to a running .NET process by its process ID.": "Attach to a running .NET process by its process ID.",
+    "Stopping debugging detaches and leaves the process running.": "Stopping debugging detaches and leaves the process running.",
+    "Enter a positive process ID other than DotCraft's own process": "Enter a positive process ID other than DotCraft's own process",
+    "Stop the current debug session before attaching": "Stop the current debug session before attaching",
+    "Process {pid}": "Process {pid}",
+    "Attaching to process {pid}…": "Attaching to process {pid}…"
   },
   "terminal": {
     "Local": "本地",
