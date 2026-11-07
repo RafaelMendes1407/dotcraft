@@ -26,6 +26,7 @@ Content-Type: application/xml
 - Explicit GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS, TRACE, and CONNECT method syntax; a bare absolute HTTP or HTTPS URL defaults to GET.
 - Request headers and a text body separated by a blank line. Duplicate headers are retained.
 - Comments starting with `#` or `//` before the request or among its headers.
+- File variables declared with `@name = value` before request lines, with bounded literal `{{name}}` interpolation. See [HTTP file variables](http-variables.md) for declaration rules and limits.
 - Request selection from the active editor buffer, with source line numbers in the selector.
 - Asynchronous execution on the shared runtime and explicit cancellation during connection or body reads.
 - The latest response's status, headers, elapsed time, and body, including HTTP error statuses.
@@ -39,7 +40,7 @@ Request files are limited to 1 MiB. Requests have a 60-second total timeout, ret
 
 Only one request runs at a time, and only the latest exchange is retained in memory. Responses are not persisted. Redirects are not followed automatically, so their original status and headers remain visible. Explicit HTTP version suffixes are not supported; protocol negotiation uses the HTTP library defaults.
 
-Variables, environment files, directives, file-backed bodies (`< file`), scripts, response-file redirection, and non-HTTP protocols are rejected before execution. A file containing unsupported syntax blocks sending rather than silently omitting its behavior. XML and HTML text bodies are supported. URLs must be absolute and must not embed credentials; authentication headers can be written explicitly.
+Environment files, dynamic variables, expressions, directives, file-backed bodies (`< file`), scripts, response-file redirection, and non-HTTP protocols are rejected before execution. A file containing unsupported syntax blocks sending rather than silently omitting its behavior. XML and HTML text bodies are supported. URLs must be absolute and must not embed credentials; authentication headers can be written explicitly.
 
 Request separators and line endings are processed as text: CRLF input is normalized to LF in body text. Binary uploads, multipart helpers, JSON formatting, authentication dialogs, custom TLS configuration, persistent history, gutter actions, and CLI execution remain outside this implementation.
 
@@ -55,6 +56,7 @@ cargo test -p rc-app -p rc-kit --offline every_text_in_the_code_has_a_translatio
 Tests use local TCP servers and headless egui interaction. They cover:
 
 - Multiple request parsing, source lines, CRLF input, headers, XML bodies, size limits, and unsupported syntax rejection.
+- File-variable interpolation, undefined names, cycles, malformed placeholders, expansion bounds, validation after interpolation, and delivery of substituted URL/header/body values to a local server.
 - Actual method, URL path, header, and XML body delivery to a local server.
 - Response status/header capture and bounded body truncation.
 - Cancellation and timeout while a server stalls during its response body.
