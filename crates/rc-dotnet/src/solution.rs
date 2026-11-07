@@ -22,7 +22,10 @@ pub enum SolutionItem {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Solution {
+    /// Build/test target and session identity, including a filter when one was opened.
     pub path: PathBuf,
+    /// Underlying `.sln` or `.slnx` whose directory owns the workspace services.
+    pub source_path: PathBuf,
     pub name: String,
     pub items: Vec<SolutionItem>,
 }
@@ -36,7 +39,7 @@ impl Solution {
         let dir = path.parent().unwrap_or(Path::new("."));
         let items = if path.extension().is_some_and(|e| e.eq_ignore_ascii_case("slnx")) { parse_slnx(&text, dir)? } else { parse_sln(&text, dir) };
         let name = path.file_stem().map_or_else(String::new, |s| s.to_string_lossy().into_owned());
-        Ok(Solution { path: path.to_path_buf(), name, items })
+        Ok(Solution { path: path.to_path_buf(), source_path: path.to_path_buf(), name, items })
     }
 
     /// Every project, depth first in solution order.
@@ -333,6 +336,7 @@ EndGlobal
         std::fs::write(&filter, r#"{"solution":{"path":"../App.sln","projects":["src\\App\\App.csproj"]}}"#).unwrap();
         let loaded = Solution::load(&filter).unwrap();
         assert_eq!(loaded.path, filter);
+        assert_eq!(loaded.source_path, dir.path().join("App.sln"));
         assert_eq!(loaded.name, "Backend");
         assert_eq!(loaded.projects().len(), 1);
         assert_eq!(loaded.projects()[0].path, dir.path().join("src/App/App.csproj"));
