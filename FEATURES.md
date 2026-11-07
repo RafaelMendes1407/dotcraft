@@ -23,10 +23,10 @@ A source implementation or passing parser test alone does not establish Rider pa
 | Status | Items |
 | --- | --- |
 | ✅ Verified | 19 |
-| 🚧 In progress | 10 |
+| 🚧 In progress | 12 |
 | 🟢 Existing | 84 |
-| 🔁 Reuse candidate | 31 |
-| ⬜ Backlog | 229 |
+| 🔁 Reuse candidate | 30 |
+| ⬜ Backlog | 228 |
 | 🚫 Out of scope | 0 |
 | **Total** | **373** |
 <!-- summary:end -->
@@ -90,6 +90,7 @@ The detailed feature inventory above and below is retained from PR 1. Verified e
 - PR 10 prevents partial application of resource-containing edits; atomic refactoring and global undo remain pending.
 - PRs 13 and 15 implement the basic HTTP Client and bounded inline variables. PR 15 depends on PR 13.
 - PR 14 verifies live attach/detach and the inherited CLI/API debugger on .NET SDK 8.0.427 and ASP.NET 8.0.33. Broader runtime and platform support is pending.
+- PR 16 adds the read-only native SQLite browser and SQL console; writes and other database engines remain pending.
 - Existing PRs 2, 3 and 5 cover solution filters, EditorConfig and SDK selection; their implementation branches remain separate review items.
 
 ## A. Desktop interface and workflow
@@ -444,7 +445,7 @@ Source / reuse boundary: `crates/rc-syntax; crates/rc-app/src/ui`.
 | J-04 | Markdown preview | 🟢 | Exercise on a real .NET fixture; record evidence. |
 | J-05 | HTTP client | 🚧 | PRs 13 and 15 verify basic HTTP execution, cancellation and inline variables; advanced HTTP integrations remain pending. |
 | J-06 | HTTP environment variables | 🚧 | PR 15 verifies inline file variables only; environment files and generated variables remain pending. |
-| J-07 | Database connections and SQL console | 🔁 | Inspect sibling implementation, adapt and verify in .NET. |
+| J-07 | Database connections and SQL console | 🚧 | PR 16 verifies read-only SQLite connections and explicit bounded SQL; writes, persistent sessions and other engines remain pending. |
 | J-08 | SQL injection support | 🔁 | Inspect sibling implementation, adapt and verify in .NET. |
 | J-09 | ASP.NET endpoints explorer | 🔁 | Inspect sibling implementation, adapt and verify in .NET. |
 | J-10 | Container tools | 🔁 | Inspect sibling implementation, adapt and verify in .NET. |
@@ -465,7 +466,7 @@ Source / reuse boundary: `crates/rc-syntax; crates/rc-app/src/ui`.
 | J-25 | gRPC client | ⬜ | Implement with integration and UI acceptance evidence. |
 | J-26 | WebSocket client | ⬜ | Implement with integration and UI acceptance evidence. |
 | J-27 | Entity Framework tooling | ⬜ | Implement with integration and UI acceptance evidence. |
-| J-28 | Database schema explorer | ⬜ | Implement with integration and UI acceptance evidence. |
+| J-28 | Database schema explorer | 🚧 | PR 16 verifies SQLite tables/views and CREATE previews; broader schema navigation and other engines remain pending. |
 | J-29 | Table data editor | ⬜ | Implement with integration and UI acceptance evidence. |
 | J-30 | SQL completion and inspections | ⬜ | Implement with integration and UI acceptance evidence. |
 | J-31 | Database migrations | ⬜ | Implement with integration and UI acceptance evidence. |

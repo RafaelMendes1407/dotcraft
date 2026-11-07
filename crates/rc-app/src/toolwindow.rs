@@ -20,6 +20,7 @@ pub enum ToolWindow {
     Find,
     Notifications,
     Nuget,
+    Database,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -55,7 +56,7 @@ impl Side {
 
 impl ToolWindow {
     /// Order of the buttons on the stripes.
-    pub const ALL: [ToolWindow; 13] = [
+    pub const ALL: [ToolWindow; 14] = [
         ToolWindow::Explorer,
         ToolWindow::Commit,
         ToolWindow::Structure,
@@ -68,6 +69,7 @@ impl ToolWindow {
         ToolWindow::Terminal,
         ToolWindow::Git,
         ToolWindow::Nuget,
+        ToolWindow::Database,
         ToolWindow::Notifications,
     ];
 
@@ -86,6 +88,7 @@ impl ToolWindow {
             ToolWindow::Find => "find",
             ToolWindow::Notifications => "notifications",
             ToolWindow::Nuget => "nuget",
+            ToolWindow::Database => "database",
         }
     }
 
@@ -104,6 +107,7 @@ impl ToolWindow {
             ToolWindow::Find => tr("Find"),
             ToolWindow::Notifications => tr("Notifications"),
             ToolWindow::Nuget => "NuGet",
+            ToolWindow::Database => tr("Database"),
         }
     }
 
@@ -122,6 +126,7 @@ impl ToolWindow {
             ToolWindow::Find => ico::TW_FIND,
             ToolWindow::Notifications => ico::TW_NOTIFICATIONS,
             ToolWindow::Nuget => ico::PACKAGE,
+            ToolWindow::Database => ico::PACKAGE,
         }
     }
 
