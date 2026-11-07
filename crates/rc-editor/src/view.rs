@@ -1138,10 +1138,10 @@ fn markup_assist(state: &mut EditorState, ch: char) {
     use rc_syntax::Lang;
     use rc_text::markup;
     let lang = state.syntax.lang;
-    if !matches!(lang, Lang::Razor | Lang::Xml) || state.selection.len() != 1 || !state.selection.primary().is_empty() {
+    if !matches!(lang, Lang::Razor | Lang::Html | Lang::Xml) || state.selection.len() != 1 || !state.selection.primary().is_empty() {
         return;
     }
-    let html = lang == Lang::Razor;
+    let html = matches!(lang, Lang::Razor | Lang::Html);
     let caret = state.caret();
     let rope = state.buffer.rope().clone();
     let mut remove = 0;
@@ -1168,6 +1168,21 @@ fn markup_assist(state: &mut EditorState, ch: char) {
     };
     let cs = rc_text::ChangeSet::single(rc_text::Change::new(caret, caret + remove, text));
     state.apply(commands::Edited { changes: cs, selection: Selection::point(caret_after) }, EditKind::Insert);
+}
+
+#[cfg(test)]
+mod web_markup_tests {
+    use super::*;
+
+    #[test]
+    fn native_html_keeps_tag_and_attribute_typing_assists() {
+        for (input, ch, expected) in [("<main>", '>', "<main></main>"), ("<input>", '>', "<input>"), ("<main class=", '=', "<main class=\"\"")] {
+            let mut editor = EditorState::new(1, Some("index.html".into()), input);
+            editor.selection = Selection::point(input.chars().count());
+            markup_assist(&mut editor, ch);
+            assert_eq!(editor.buffer.rope().to_string(), expected);
+        }
+    }
 }
 
 fn electric_close_brace(rope: &rc_text::Rope, state: &EditorState) -> Option<commands::Edited> {
