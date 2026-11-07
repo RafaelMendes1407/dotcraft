@@ -6,6 +6,7 @@
     "Minimize": "Réduire"
   },
   "app": {
+    "Open a project before attaching to a process": "Open a project before attaching to a process",
     " columns": " colonnes",
     "(not found)": "(introuvable)",
     ".NET CLI": "CLI .NET",

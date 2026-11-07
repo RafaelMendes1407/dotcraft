@@ -1,6 +1,6 @@
 # Attach to a running process
 
-Use Attach to Process from Search Everywhere, the run configuration menu, or the native Run menu. Enter the decimal process ID of an existing .NET process. DotCraft rejects zero, malformed IDs, its own PID, and attempts to replace an active debug session. No build or application launch is required. Restart is disabled for attached sessions so it cannot launch an unrelated run configuration.
+With a workspace open, use Attach to Process from Search Everywhere, the run configuration menu, or the native Run menu. Enter the decimal process ID of an existing .NET process. DotCraft rejects zero, malformed IDs, its own PID, and attempts to replace an active debug session. No build or application launch is required. A workspace without a run configuration is sufficient. From the welcome screen or a standalone file, the PID dialog explains that a project must be opened and disables Attach, including the Enter shortcut; this prevents starting an invisible debugging session in the standalone-file layout. Restart is disabled for attached sessions so it cannot launch an unrelated run configuration.
 
 The existing netcoredbg adapter is located or downloaded on first use. Attachment preserves watches and resets previous session presentation state. Stop disconnects the debugger from an attached process rather than terminating that process.
 
@@ -17,7 +17,7 @@ cargo test -p rc-app restart_is_disabled_for_attach_sessions_and_available_for_l
 cargo test -p rc-app -p rc-kit every_text_in_the_code_has_a_translation --offline
 ```
 
-The attach action, invalid PID rejection, PID parsing, workspace closure, stale download events, Stop interactions, and attach-versus-launch Restart behavior have passed targeted tests. The attach action also compiles independently from the parallel HTTP, web, stash, settings, and stripe changes.
+The attach action, workspace requirement for button and Enter activation, invalid PID rejection, PID parsing, workspace closure, stale download events, Stop interactions, and attach-versus-launch Restart behavior have passed targeted tests. The attach action also compiles independently from the parallel HTTP, web, stash, settings, and stripe changes.
 
 The live regression requires an installed .NET 8 SDK, netcoredbg, and restored fixture dependencies:
 

@@ -1005,7 +1005,7 @@ fn attach_pid(text: &str) -> Option<u32> {
 
 fn attach_process(app: &mut DotCraftApp, ctx: &Context, text: &mut String, focus: &mut bool) -> Outcome {
     let pid = attach_pid(text);
-    let available = !app.debugger.active() && app.debugger.downloading.is_none();
+    let available = app.workspace.is_some() && !app.debugger.active() && app.debugger.downloading.is_none();
     let mut enter = false;
     let ((attach, cancel), esc) = modal(ctx, "attach_process", 460.0, |ui| {
         title(ui, tr("Attach to Process…"));
@@ -1016,8 +1016,10 @@ fn attach_process(app: &mut DotCraftApp, ctx: &Context, text: &mut String, focus
         if std::mem::take(focus) {
             response.request_focus();
         }
-        enter = response.has_focus() && ui.input(|i| i.key_pressed(Key::Enter));
-        if !available {
+        enter = (response.has_focus() || response.lost_focus()) && ui.input(|i| i.key_pressed(Key::Enter));
+        if app.workspace.is_none() {
+            ui.label(tr("Open a project before attaching to a process"));
+        } else if !available {
             ui.label(tr("Stop the current debug session before attaching"));
         } else if !text.is_empty() && pid.is_none() {
             ui.colored_label(rc_kit::pal(ui).error, tr("Enter a positive process ID other than DotCraft's own process"));
@@ -1047,5 +1049,60 @@ mod attach_tests {
             assert_eq!(attach_pid(text), None, "{text}");
         }
     }
+
+    #[test]
+    fn attach_dialog_requires_a_workspace_for_button_and_enter() {
+        use super::{Dialog, Settings};
+        use egui_kittest::kittest::{NodeT, Queryable};
+        use rc_core::{Waker, Workspace};
+        let _lock = crate::screens::HOME_LOCK.lock().unwrap_or_else(|error| error.into_inner());
+        rc_kit::i18n::set_lang(rc_kit::i18n::Lang::En);
+        for mode in ["welcome", "standalone", "workspace"] {
+            let temp = tempfile::tempdir().unwrap();
+            let root = temp.path().join("project");
+            std::fs::create_dir(&root).unwrap();
+            let adapter = temp.path().join("not-an-executable-adapter");
+            // Adapter selection is deterministic, but this non-executable file cannot
+            // start an adapter or attach to an unrelated real operating-system process.
+            std::fs::write(&adapter, b"").unwrap();
+            let mut app = crate::app::DotCraftApp::with_settings(
+                Settings { netcoredbg_path: Some(adapter), ..Settings::default() }, Waker::noop(), None,
+            );
+            if mode == "standalone" {
+                let file = root.join("notes.txt");
+                std::fs::write(&file, "Standalone file").unwrap();
+                app.open_file(&file);
+            } else if mode == "workspace" {
+                app.workspace = Some(crate::app::WorkspaceState { ws: Workspace::open(&root).unwrap(), solution: None });
+            }
+            assert!(app.runner.selected_config().is_none());
+            app.run_ide_action(&egui::Context::default(), rc_editor::Action::AttachProcess);
+            let pid = if std::process::id() == 42 { "43" } else { "42" };
+            app.dialog = Some(Dialog::AttachProcess { pid: pid.into(), focus: true });
+            let mut first = true;
+            let mut harness = egui_kittest::Harness::builder().with_size(egui::vec2(800.0, 600.0)).build_ui_state(
+                move |ui, app: &mut crate::app::DotCraftApp| {
+                    if std::mem::take(&mut first) { rc_kit::theme::install_fonts(ui.ctx()); return; }
+                    super::show(app, ui.ctx());
+                }, app,
+            );
+            harness.run_steps(3);
+            assert_eq!(harness.get_by_label("Attach").accesskit_node().is_disabled(), mode != "workspace", "{mode}");
+            if mode != "workspace" { harness.get_by_label("Open a project before attaching to a process"); }
+            harness.get_by_role(egui::accesskit::Role::TextInput).focus();
+            harness.run_steps(1);
+            harness.key_press(egui::Key::Enter);
+            harness.run_steps(2);
+            if mode == "workspace" {
+                assert!(harness.state().debugger.session.is_some());
+                assert_eq!(harness.state().dock.bottom, Some(crate::toolwindow::ToolWindow::Debug));
+            } else {
+                assert!(matches!(harness.state().dialog, Some(Dialog::AttachProcess { .. })));
+                assert!(harness.state().debugger.session.is_none());
+                assert!(harness.state().debugger.downloading.is_none());
+            }
+        }
+    }
+
 }
 

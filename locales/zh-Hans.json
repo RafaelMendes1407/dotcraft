@@ -6,6 +6,7 @@
     "Minimize": "最小化"
   },
   "app": {
+    "Open a project before attaching to a process": "Open a project before attaching to a process",
     " columns": " 列",
     "(not found)": "(未找到)",
     ".NET CLI": ".NET CLI",

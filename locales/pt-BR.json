@@ -6,6 +6,7 @@
     "Minimize": "Minimizar"
   },
   "app": {
+    "Open a project before attaching to a process": "Open a project before attaching to a process",
     " columns": " colunas",
     "(not found)": "(não encontrado)",
     ".NET CLI": "CLI do .NET",
