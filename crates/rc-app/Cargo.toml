@@ -10,6 +10,8 @@ name = "dotcraft"
 path = "src/main.rs"
 
 [dependencies]
+rusqlite = { version = "=0.40.1", features = ["bundled", "hooks", "limits", "extra_check"] }
+fallible-iterator = "0.3"
 dunce.workspace = true
 anyhow.workspace = true
 serde.workspace = true
