@@ -10,6 +10,7 @@ pub mod markdown;
 pub mod new_project;
 pub mod nuget;
 pub mod header;
+pub mod main_menu;
 pub mod status;
 pub mod run_windows;
 pub mod search_popup;

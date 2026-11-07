@@ -627,5 +627,13 @@
     "Editor Only": "仅编辑器",
     "Editor and Preview": "编辑器和预览",
     "Preview Only": "仅预览"
+  },
+  "main-menu": {
+    "Main Menu": "Main Menu",
+    "Move Line Down": "Move Line Down",
+    "Move Line Up": "Move Line Up",
+    "Next Tab": "Next Tab",
+    "Previous Tab": "Previous Tab",
+    "Save": "Save"
   }
 }
