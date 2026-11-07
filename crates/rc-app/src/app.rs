@@ -132,7 +132,7 @@ impl DotCraftApp {
             keymap,
             editor_config,
             workspace: None,
-            docs: Docs::new(pool),
+            docs: Docs::with_waker(pool, waker.clone()),
             dock: Dock::default(),
             explorer: ExplorerState::default(),
             dialog: None,

@@ -23,9 +23,9 @@ A source implementation or passing parser test alone does not establish Rider pa
 | Status | Items |
 | --- | --- |
 | ✅ Verified | 0 |
-| 🚧 In progress | 1 |
+| 🚧 In progress | 2 |
 | 🟢 Existing | 104 |
-| 🔁 Reuse candidate | 34 |
+| 🔁 Reuse candidate | 33 |
 | ⬜ Backlog | 234 |
 | 🚫 Out of scope | 0 |
 | **Total** | **373** |
@@ -78,6 +78,30 @@ with filters, interactive editing, and dependency-loading behavior. B-14 remains
 The existing workspace root stays the filter directory; filters stored outside the
 solution root need a separate watcher/search-root audit.
 
+
+## EditorConfig implementation evidence
+
+C-18 resolves `indent_style`, `indent_size` (including `tab`) and `tab_width` for each
+opened document on a dedicated background worker. Ancestor files and ordered sections
+are merged with `root=true` and `unset` support. Config changes and focus restoration
+refresh open documents; removed rules restore detected indentation. Automatic and manual
+reloads refresh the detected baseline while retaining configured indentation; file and
+folder renames resolve rules for the new path. Stale results cannot
+change a closed document or overwrite a newer request. Tabs and spaces affect editor
+commands and existing Roslyn formatting request options without rewriting file contents.
+
+The glob normalization and bounded file reader are adapted from CrabCraft's
+`rc-core/src/code_style.rs` under the existing MIT OR Apache-2.0 licenses. The resolver
+retains .NET semantics and imports no rustfmt configuration. Tests cover C# rules,
+parent precedence, root boundaries, unset, wildcard/brace patterns, invalid settings,
+cancellation and oversized inputs; a real Shop C# source verifies Tab editing, undo,
+configuration updates and removal through the document lifecycle.
+
+Validation: `cargo test -p rc-core --lib` (9 passed) and
+`cargo test -p rc-app docs::tests` (6 passed).
+Specification reference: [EditorConfig](https://editorconfig.org/).
+Remaining: save-time charset/newline/whitespace properties, numeric-range globs,
+formatting option audit and graphical acceptance. C-18 remains partial.
 
 ## A. Desktop interface and workflow
 
@@ -175,7 +199,7 @@ Source / reuse boundary: `crates/rc-editor; crates/rc-text; crates/rc-syntax; cr
 | C-15 | Diagnostics in editor | 🟢 | Exercise on a real .NET fixture; record evidence. |
 | C-16 | Large-file safeguards | 🔁 | Inspect sibling implementation, adapt and verify in .NET. |
 | C-17 | Complete statement | 🔁 | Inspect sibling implementation, adapt and verify in .NET. |
-| C-18 | EditorConfig integration | 🔁 | Inspect sibling implementation, adapt and verify in .NET. |
+| C-18 | EditorConfig integration | 🚧 | Indentation subset verified: 10 core, 26 text, 8 document tests plus editor regressions; full conformance remains pending. |
 | C-19 | Spelling assistance | 🔁 | Inspect sibling implementation, adapt and verify in .NET. |
 | C-20 | Web language editor improvements | 🔁 | Inspect sibling implementation, adapt and verify in .NET. |
 | C-21 | Smart and type-matching completion | ⬜ | Implement with integration and UI acceptance evidence. |
@@ -535,3 +559,7 @@ Source / reuse boundary: `crates/rc-term; crates/rc-core; CrabCraft shared modul
 | L-26 | Crash reporting controls | ⬜ | Implement with integration and UI acceptance evidence. |
 | L-27 | Offline tool installation | ⬜ | Implement with integration and UI acceptance evidence. |
 | L-28 | Platform packaging verification | ⬜ | Implement with integration and UI acceptance evidence. |
+
+## EditorConfig indentation validation
+
+The original per-file integration now handles embedded globstars and logical mixed indentation, including indentation narrower than a tab stop and indent_size=tab with an implicit editor tab width. Final exact-snapshot validation passed with --locked --offline in a dedicated target: 10 core tests, 26 text tests, 8 document tests, and application/editor mixed-indentation regressions. No unrelated feature source or dependency changes were included. See [EditorConfig implementation evidence](docs/implementation/editorconfig.md). Numeric-range globs, save-time properties, and full-document JSON/XML mixed-indentation formatting remain pending.

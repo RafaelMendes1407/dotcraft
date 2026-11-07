@@ -407,7 +407,7 @@ fn paint_text_area(ui: &Ui, state: &mut EditorState, config: &EditorConfig, sche
     // Indent guides: one at the indent of every enclosing block (IntelliJ draws them from
     // the line of the `{` down to the line before the `}`).
     if config.show_indent_guides {
-        let unit = state.indent.unit.chars().count().max(1);
+        let unit = state.indent.width();
         let tab = state.indent.tab_width;
         let indent_of = |line: usize| -> Option<usize> {
             let t = rope.line(line);
@@ -1178,15 +1178,29 @@ fn electric_close_brace(rope: &rc_text::Rope, state: &EditorState) -> Option<com
     if !before.chars().all(|c| c == ' ' || c == '\t') || before.is_empty() {
         return None;
     }
-    let unit = state.indent.unit.chars().count();
-    let new_indent: String = if state.indent.unit == "\t" {
-        before.chars().skip(1).collect()
-    } else {
-        " ".repeat(before.chars().count().saturating_sub(unit))
-    };
+    let width = state.indent.previous_stop(state.indent.columns(&before));
+    let new_indent = state.indent.whitespace(0, width);
     let text = format!("{new_indent}}}");
     let cs = rc_text::ChangeSet::single(rc_text::Change::new(ls, pos, text.clone()));
     Some(commands::Edited { changes: cs, selection: Selection::point(ls + text.chars().count()) })
+}
+
+#[cfg(test)]
+mod mixed_indentation_tests {
+    use super::*;
+
+    #[test]
+    fn electric_closing_brace_outdents_by_visual_columns_and_undoes() {
+        let mut editor = EditorState::new(1, Some("App.cs".into()), "\t\t  ");
+        editor.indent = commands::Indent { unit: "\t ".into(), tab_width: 3, prefer_tabs: true };
+        editor.selection = Selection::point(4);
+        let edit = electric_close_brace(editor.buffer.rope(), &editor).unwrap();
+        editor.apply(edit, EditKind::Other);
+        assert_eq!(editor.buffer.rope().to_string(), "\t }");
+        assert_eq!(commands::visual_col(editor.buffer.rope(), editor.caret() - 1, 3), 4);
+        editor.undo();
+        assert_eq!(editor.buffer.rope().to_string(), "\t\t  ");
+    }
 }
 
 fn copy(ui: &Ui, state: &mut EditorState, cut: bool) {

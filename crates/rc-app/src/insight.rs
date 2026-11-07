@@ -824,7 +824,7 @@ impl Insight {
         if !applies {
             return;
         }
-        let options = json!({ "tabSize": doc.editor.indent.tab_width, "insertSpaces": doc.editor.indent.unit != "\t" });
+        let options = json!({ "tabSize": doc.editor.indent.tab_width, "insertSpaces": !doc.editor.indent.uses_tabs() });
         let p = session.client.request_raw(
             "textDocument/_vs_onAutoInsert",
             json!({ "_vs_textDocument": { "uri": path_to_uri(&doc.path).as_str() }, "_vs_position": convert::lsp_position(rope, caret), "_vs_ch": c.to_string(), "_vs_options": options }),
@@ -836,7 +836,7 @@ impl Insight {
     fn request_type_format(&mut self, doc: &Doc, c: char) {
         let Some(session) = &self.session else { return };
         let rope = doc.editor.buffer.rope();
-        let options = json!({ "tabSize": doc.editor.indent.tab_width, "insertSpaces": doc.editor.indent.unit != "\t" });
+        let options = json!({ "tabSize": doc.editor.indent.tab_width, "insertSpaces": !doc.editor.indent.uses_tabs() });
         let p = session.client.request_raw(
             "textDocument/onTypeFormatting",
             json!({ "textDocument": { "uri": path_to_uri(&doc.path).as_str() }, "position": convert::lsp_position(rope, doc.editor.caret()), "ch": c.to_string(), "options": options }),
@@ -1080,7 +1080,7 @@ impl Insight {
         let rope = doc.editor.buffer.rope();
         let sel = doc.editor.selection.primary();
         let uri = path_to_uri(&doc.path);
-        let options = json!({ "tabSize": doc.editor.indent.tab_width, "insertSpaces": doc.editor.indent.unit != "\t" });
+        let options = json!({ "tabSize": doc.editor.indent.tab_width, "insertSpaces": !doc.editor.indent.uses_tabs() });
         let p = if sel.is_empty() {
             session.client.request_raw("textDocument/formatting", json!({ "textDocument": { "uri": uri.as_str() }, "options": options }))
         } else {
