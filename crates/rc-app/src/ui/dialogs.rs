@@ -1013,6 +1013,103 @@ fn file_structure(app: &mut DotCraftApp, ctx: &Context, filter: &mut String, sel
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use egui_kittest::kittest::Queryable;
+
+    #[test]
+    fn responsive_settings_keep_pages_and_confirmation_inside_the_viewport() {
+        let _lock = crate::screens::HOME_LOCK.lock().unwrap_or_else(|error| error.into_inner());
+        let home = tempfile::tempdir().unwrap();
+        for size in [vec2(1280.0, 800.0), vec2(800.0, 500.0), vec2(800.0, 300.0), vec2(640.0, 400.0), vec2(480.0, 320.0)] {
+            let mut harness = crate::screens::harness(crate::screens::test_app(home.path(), true), size);
+            let mut widths = Vec::new();
+            for (page, _) in settings_pages() {
+                harness.state_mut().dialog = Some(Dialog::Settings { draft: Box::new(harness.state().settings.clone()), page });
+                harness.run_steps(5);
+                let viewport = egui::Rect::from_min_size(egui::Pos2::ZERO, size);
+                let mut heights = Vec::new();
+                for _ in 0..15 {
+                    harness.run_steps(1);
+                    let modal = harness.ctx.memory(|memory| memory.area_rect(Id::new("settings"))).unwrap();
+                    assert!(viewport.contains_rect(modal), "settings outside {size:?}: {modal:?}");
+                    heights.push(modal.height());
+                }
+                assert!(heights.windows(2).all(|pair| (pair[0] - pair[1]).abs() < 1.0), "settings height must settle: {heights:?}");
+                let modal = harness.ctx.memory(|memory| memory.area_rect(Id::new("settings"))).unwrap();
+                widths.push(modal.width());
+                for label in [tr("OK"), tr("Cancel")] {
+                    assert!(viewport.contains_rect(harness.get_by_label(label).rect()), "{label} must remain reachable at {size:?}");
+                }
+            }
+            assert!(widths.windows(2).all(|pair| (pair[0] - pair[1]).abs() < 1.0), "settings width must remain stable across pages: {widths:?}");
+        }
+    }
+
+    #[test]
+    fn responsive_settings_scroll_to_the_last_editor_option_and_cancel_the_draft() {
+        let _lock = crate::screens::HOME_LOCK.lock().unwrap_or_else(|error| error.into_inner());
+        let home = tempfile::tempdir().unwrap();
+        for size in [vec2(480.0, 320.0), vec2(800.0, 300.0)] {
+            let app = crate::screens::test_app(home.path(), true);
+            let original = app.settings.tab_colors;
+            let mut harness = crate::screens::harness(app, size);
+            harness.state_mut().dialog = Some(Dialog::Settings { draft: Box::new(harness.state().settings.clone()), page: SettingsPage::Appearance });
+            harness.run_steps(3);
+            if SettingsLayout::for_viewport(size).compact {
+                harness.get_by_value(tr("Appearance")).click();
+                harness.run_steps(2);
+            }
+            harness.get_by_label(tr("Editor")).click();
+            harness.run_steps(3);
+            harness.input_mut().events.push(egui::Event::PointerMoved(egui::pos2(size.x * 0.6, size.y * 0.5)));
+            harness.input_mut().events.push(egui::Event::MouseWheel {
+                unit: egui::MouseWheelUnit::Point,
+                delta: vec2(0.0, -1000.0),
+                phase: egui::TouchPhase::Move,
+                modifiers: egui::Modifiers::NONE,
+            });
+            harness.run_steps(20);
+            let option = harness.get_by_label(tr("Color tabs by kind of file"));
+            assert!(egui::Rect::from_min_size(egui::Pos2::ZERO, size).contains_rect(option.rect()));
+            option.click();
+            harness.run_steps(2);
+            match &harness.state().dialog {
+                Some(Dialog::Settings { draft, page: SettingsPage::Editor }) => assert_eq!(draft.tab_colors, !original),
+                _ => panic!("editor settings must remain open after editing"),
+            }
+            harness.get_by_label(tr("Cancel")).click();
+            harness.run_steps(2);
+            assert!(harness.state().dialog.is_none());
+            assert_eq!(harness.state().settings.tab_colors, original);
+        }
+    }
+
+    #[test]
+    fn responsive_settings_tool_fields_fit_long_paths_without_horizontal_scrolling() {
+        let _lock = crate::screens::HOME_LOCK.lock().unwrap_or_else(|error| error.into_inner());
+        let home = tempfile::tempdir().unwrap();
+        for size in [vec2(480.0, 320.0), vec2(800.0, 300.0)] {
+            let app = crate::screens::test_app(home.path(), true);
+            let mut draft = app.settings.clone();
+            let paths: Vec<String> = ["dotnet", "roslyn", "netcoredbg"].into_iter().map(|tool| format!("/tools/{}/{tool}", "long-folder/".repeat(20))).collect();
+            draft.dotnet_path = Some(paths[0].clone().into());
+            draft.roslyn_path = Some(paths[1].clone().into());
+            draft.netcoredbg_path = Some(paths[2].clone().into());
+            let mut harness = crate::screens::harness(app, size);
+            harness.state_mut().dialog = Some(Dialog::Settings { draft: Box::new(draft), page: SettingsPage::Tools });
+            harness.run_steps(5);
+            let modal = harness.ctx.memory(|memory| memory.area_rect(Id::new("settings"))).unwrap();
+            for path in paths {
+                let field = harness.get(egui_kittest::kittest::By::new().value(&path).role(egui::accesskit::Role::TextInput)).rect();
+                assert!(field.left() >= modal.left() && field.right() <= modal.right(), "tool path field outside modal: {field:?}");
+                assert!(field.width() > 60.0, "path field must remain usable at {size:?}: {field:?}");
+            }
+            for browse in harness.get_all_by_label(tr("Browse…")) {
+                assert!(browse.rect().left() >= modal.left() && browse.rect().right() <= modal.right());
+            }
+        }
+    }
+
     #[test]
     fn skeleton_namespace_follows_the_project_folder() {
         let dir = tempfile::tempdir().unwrap();
