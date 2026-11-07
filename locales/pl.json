@@ -627,5 +627,13 @@
     "Editor Only": "Tylko edytor",
     "Editor and Preview": "Edytor i podgląd",
     "Preview Only": "Tylko podgląd"
+  },
+  "main-menu": {
+    "Main Menu": "Main Menu",
+    "Move Line Down": "Move Line Down",
+    "Move Line Up": "Move Line Up",
+    "Next Tab": "Next Tab",
+    "Previous Tab": "Previous Tab",
+    "Save": "Save"
   }
 }
