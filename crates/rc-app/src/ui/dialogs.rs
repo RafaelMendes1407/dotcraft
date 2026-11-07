@@ -109,36 +109,64 @@ fn buttons(ui: &mut Ui, ok: &str, enabled: bool) -> (bool, bool) {
     res
 }
 
+/// Responsive geometry adapted from CrabCraft's native settings dialog.
+/// The viewport, rather than page contents, determines the modal's bounds.
+struct SettingsLayout { width: f32, nav: f32, page: f32, height: f32, compact: bool }
+
+impl SettingsLayout {
+    fn for_viewport(viewport: egui::Vec2) -> Self {
+        let width = (viewport.x - 32.0).clamp(1.0, 720.0);
+        let compact = width < 620.0;
+        let nav = if compact { 0.0 } else { 170.0 };
+        let page = if compact { width } else { width - nav - 24.0 };
+        let chrome = if compact { 156.0 } else { 120.0 };
+        let height = (viewport.y * 0.7).min(420.0).min((viewport.y - chrome).max(1.0));
+        Self { width, nav, page, height, compact }
+    }
+}
+
+fn settings_pages() -> [(SettingsPage, &'static str); 4] {
+    [
+        (SettingsPage::Appearance, tr("Appearance")),
+        (SettingsPage::Editor, tr("Editor")),
+        (SettingsPage::Keymap, tr("Keymap")),
+        (SettingsPage::Tools, tr("Tools")),
+    ]
+}
+
 fn settings(app: &mut DotCraftApp, ctx: &Context, draft: &mut Settings, page: &mut SettingsPage) -> Outcome {
-    let p = rc_kit::theme::palette(ctx.global_style().visuals.dark_mode);
-    let ((ok, cancel), esc) = modal(ctx, "settings", 720.0, |ui| {
+    let layout = SettingsLayout::for_viewport(ctx.content_rect().size());
+    let ((ok, cancel), esc) = modal(ctx, "settings", layout.width, |ui| {
         title(ui, tr("Settings"));
+        if layout.compact {
+            let selected = settings_pages().into_iter().find(|(pg, _)| pg == page).map_or("", |(_, label)| label);
+            egui::ComboBox::from_id_salt("settings_category").selected_text(selected).width(layout.width - 8.0).show_ui(ui, |ui| {
+                for (pg, label) in settings_pages() { ui.selectable_value(page, pg, label); }
+            }).response.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::ComboBox, true, selected));
+            ui.add_space(8.0);
+        }
         ui.horizontal_top(|ui| {
-            ui.vertical(|ui| {
-                ui.set_width(170.0);
-                for (pg, label) in [
-                    (SettingsPage::Appearance, tr("Appearance")),
-                    (SettingsPage::Editor, tr("Editor")),
-                    (SettingsPage::Keymap, tr("Keymap")),
-                    (SettingsPage::Tools, tr("Tools")),
-                ] {
-                    let (r, resp) = ui.allocate_exact_size(vec2(170.0, 28.0), egui::Sense::click());
-                    if *page == pg {
-                        ui.painter().rect_filled(r, 6.0, p.selection);
-                    } else if resp.hovered() {
-                        ui.painter().rect_filled(r, 6.0, p.row_hover);
+            if !layout.compact {
+                egui::ScrollArea::vertical().id_salt("settings_navigation").max_height(layout.height).min_scrolled_height(layout.height).auto_shrink([false, false]).max_width(layout.nav).show(ui, |ui| ui.vertical(|ui| {
+                    ui.set_width(layout.nav);
+                    for (pg, label) in settings_pages() {
+                        if ui.add_sized(vec2(layout.nav, 28.0), egui::Button::selectable(*page == pg, label)).clicked() {
+                            *page = pg;
+                        }
                     }
-                    ui.painter().text(r.left_center() + vec2(10.0, 0.0), Align2::LEFT_CENTER, label, FontId::proportional(13.0), p.text);
-                    resp.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::SelectableLabel, true, *page == pg, label));
-                    if resp.clicked() {
-                        *page = pg;
-                    }
+                }));
+                ui.add_space(16.0);
+            }
+            // Scroll both axes when a grid needs more width, while keeping the footer fixed.
+            // Tools stack their fields and use the available width instead of widening the modal.
+            let content_width = (layout.page - ui.spacing().scroll.allocated_width() - ui.spacing().scroll.bar_width - 12.0).max(40.0);
+            egui::ScrollArea::new([*page != SettingsPage::Tools, true]).id_salt("settings_fixed_page").max_height(layout.height).min_scrolled_height(layout.height).max_width(layout.page).auto_shrink([false, false]).show(ui, |ui| ui.with_layout(egui::Layout::top_down(egui::Align::Min), |ui| {
+                ui.set_width(content_width);
+                ui.set_height(layout.height);
+                if *page == SettingsPage::Tools {
+                    settings_tools(ui, draft);
+                    return;
                 }
-            });
-            ui.add_space(16.0);
-            ui.vertical(|ui| {
-                ui.set_min_height(320.0);
-                ui.set_width(500.0);
                 egui::Grid::new("settings_grid").num_columns(2).spacing(vec2(16.0, 10.0)).show(ui, |ui| match page {
                     SettingsPage::Appearance => {
                         ui.label(tr("Theme"));
@@ -218,30 +246,10 @@ fn settings(app: &mut DotCraftApp, ctx: &Context, draft: &mut Settings, page: &m
                             });
                         ui.end_row();
                     }
-                    SettingsPage::Tools => {
-                        for (label, value) in [
-                            (tr(".NET CLI"), &mut draft.dotnet_path),
-                            (tr("Roslyn language server"), &mut draft.roslyn_path),
-                            (tr("netcoredbg debugger"), &mut draft.netcoredbg_path),
-                        ] {
-                            ui.label(label);
-                            ui.horizontal(|ui| {
-                                let mut text = value.as_ref().map(|p| p.display().to_string()).unwrap_or_default();
-                                let resp = ui.add(egui::TextEdit::singleline(&mut text).hint_text(tr("Detect automatically")).desired_width(300.0));
-                                if resp.changed() {
-                                    *value = (!text.trim().is_empty()).then(|| PathBuf::from(text.trim()));
-                                }
-                                if ui.button(tr("Browse…")).clicked()
-                                    && let Some(p) = rfd::FileDialog::new().pick_file()
-                                {
-                                    *value = Some(p);
-                                }
-                            });
-                            ui.end_row();
-                        }
-                    }
+                    SettingsPage::Tools => {}
+
                 });
-            });
+            }));
         });
         buttons(ui, tr("OK"), true)
     });
@@ -250,6 +258,31 @@ fn settings(app: &mut DotCraftApp, ctx: &Context, draft: &mut Settings, page: &m
         return Outcome::Close;
     }
     if cancel || esc { Outcome::Close } else { Outcome::Keep }
+}
+
+fn settings_tools(ui: &mut Ui, draft: &mut Settings) {
+    ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Wrap);
+    for (label, value) in [
+        (tr(".NET CLI"), &mut draft.dotnet_path),
+        (tr("Roslyn language server"), &mut draft.roslyn_path),
+        (tr("netcoredbg debugger"), &mut draft.netcoredbg_path),
+    ] {
+        let label_response = ui.label(label);
+        let browse_width = ui.fonts_mut(|fonts| fonts.layout_no_wrap(tr("Browse…").to_string(), FontId::proportional(13.0), rc_kit::pal(ui).text).size().x) + 24.0;
+        let field_width = (ui.available_width() - browse_width - ui.spacing().item_spacing.x).max(24.0);
+        ui.horizontal(|ui| {
+            let mut text = value.as_ref().map(|path| path.display().to_string()).unwrap_or_default();
+            if ui.add(egui::TextEdit::singleline(&mut text).hint_text(tr("Detect automatically")).desired_width(field_width)).labelled_by(label_response.id).changed() {
+                *value = (!text.trim().is_empty()).then(|| PathBuf::from(text.trim()));
+            }
+            if ui.button(tr("Browse…")).clicked()
+                && let Some(path) = rfd::FileDialog::new().pick_file()
+            {
+                *value = Some(path);
+            }
+        });
+        ui.add_space(10.0);
+    }
 }
 
 fn lang_code(l: Lang) -> &'static str {
@@ -980,6 +1013,103 @@ fn file_structure(app: &mut DotCraftApp, ctx: &Context, filter: &mut String, sel
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use egui_kittest::kittest::Queryable;
+
+    #[test]
+    fn responsive_settings_keep_pages_and_confirmation_inside_the_viewport() {
+        let _lock = crate::screens::HOME_LOCK.lock().unwrap_or_else(|error| error.into_inner());
+        let home = tempfile::tempdir().unwrap();
+        for size in [vec2(1280.0, 800.0), vec2(800.0, 500.0), vec2(800.0, 300.0), vec2(640.0, 400.0), vec2(480.0, 320.0)] {
+            let mut harness = crate::screens::harness(crate::screens::test_app(home.path(), true), size);
+            let mut widths = Vec::new();
+            for (page, _) in settings_pages() {
+                harness.state_mut().dialog = Some(Dialog::Settings { draft: Box::new(harness.state().settings.clone()), page });
+                harness.run_steps(5);
+                let viewport = egui::Rect::from_min_size(egui::Pos2::ZERO, size);
+                let mut heights = Vec::new();
+                for _ in 0..15 {
+                    harness.run_steps(1);
+                    let modal = harness.ctx.memory(|memory| memory.area_rect(Id::new("settings"))).unwrap();
+                    assert!(viewport.contains_rect(modal), "settings outside {size:?}: {modal:?}");
+                    heights.push(modal.height());
+                }
+                assert!(heights.windows(2).all(|pair| (pair[0] - pair[1]).abs() < 1.0), "settings height must settle: {heights:?}");
+                let modal = harness.ctx.memory(|memory| memory.area_rect(Id::new("settings"))).unwrap();
+                widths.push(modal.width());
+                for label in [tr("OK"), tr("Cancel")] {
+                    assert!(viewport.contains_rect(harness.get_by_label(label).rect()), "{label} must remain reachable at {size:?}");
+                }
+            }
+            assert!(widths.windows(2).all(|pair| (pair[0] - pair[1]).abs() < 1.0), "settings width must remain stable across pages: {widths:?}");
+        }
+    }
+
+    #[test]
+    fn responsive_settings_scroll_to_the_last_editor_option_and_cancel_the_draft() {
+        let _lock = crate::screens::HOME_LOCK.lock().unwrap_or_else(|error| error.into_inner());
+        let home = tempfile::tempdir().unwrap();
+        for size in [vec2(480.0, 320.0), vec2(800.0, 300.0)] {
+            let app = crate::screens::test_app(home.path(), true);
+            let original = app.settings.tab_colors;
+            let mut harness = crate::screens::harness(app, size);
+            harness.state_mut().dialog = Some(Dialog::Settings { draft: Box::new(harness.state().settings.clone()), page: SettingsPage::Appearance });
+            harness.run_steps(3);
+            if SettingsLayout::for_viewport(size).compact {
+                harness.get_by_value(tr("Appearance")).click();
+                harness.run_steps(2);
+            }
+            harness.get_by_label(tr("Editor")).click();
+            harness.run_steps(3);
+            harness.input_mut().events.push(egui::Event::PointerMoved(egui::pos2(size.x * 0.6, size.y * 0.5)));
+            harness.input_mut().events.push(egui::Event::MouseWheel {
+                unit: egui::MouseWheelUnit::Point,
+                delta: vec2(0.0, -1000.0),
+                phase: egui::TouchPhase::Move,
+                modifiers: egui::Modifiers::NONE,
+            });
+            harness.run_steps(20);
+            let option = harness.get_by_label(tr("Color tabs by kind of file"));
+            assert!(egui::Rect::from_min_size(egui::Pos2::ZERO, size).contains_rect(option.rect()));
+            option.click();
+            harness.run_steps(2);
+            match &harness.state().dialog {
+                Some(Dialog::Settings { draft, page: SettingsPage::Editor }) => assert_eq!(draft.tab_colors, !original),
+                _ => panic!("editor settings must remain open after editing"),
+            }
+            harness.get_by_label(tr("Cancel")).click();
+            harness.run_steps(2);
+            assert!(harness.state().dialog.is_none());
+            assert_eq!(harness.state().settings.tab_colors, original);
+        }
+    }
+
+    #[test]
+    fn responsive_settings_tool_fields_fit_long_paths_without_horizontal_scrolling() {
+        let _lock = crate::screens::HOME_LOCK.lock().unwrap_or_else(|error| error.into_inner());
+        let home = tempfile::tempdir().unwrap();
+        for size in [vec2(480.0, 320.0), vec2(800.0, 300.0)] {
+            let app = crate::screens::test_app(home.path(), true);
+            let mut draft = app.settings.clone();
+            let paths: Vec<String> = ["dotnet", "roslyn", "netcoredbg"].into_iter().map(|tool| format!("/tools/{}/{tool}", "long-folder/".repeat(20))).collect();
+            draft.dotnet_path = Some(paths[0].clone().into());
+            draft.roslyn_path = Some(paths[1].clone().into());
+            draft.netcoredbg_path = Some(paths[2].clone().into());
+            let mut harness = crate::screens::harness(app, size);
+            harness.state_mut().dialog = Some(Dialog::Settings { draft: Box::new(draft), page: SettingsPage::Tools });
+            harness.run_steps(5);
+            let modal = harness.ctx.memory(|memory| memory.area_rect(Id::new("settings"))).unwrap();
+            for path in paths {
+                let field = harness.get(egui_kittest::kittest::By::new().value(&path).role(egui::accesskit::Role::TextInput)).rect();
+                assert!(field.left() >= modal.left() && field.right() <= modal.right(), "tool path field outside modal: {field:?}");
+                assert!(field.width() > 60.0, "path field must remain usable at {size:?}: {field:?}");
+            }
+            for browse in harness.get_all_by_label(tr("Browse…")) {
+                assert!(browse.rect().left() >= modal.left() && browse.rect().right() <= modal.right());
+            }
+        }
+    }
+
     #[test]
     fn skeleton_namespace_follows_the_project_folder() {
         let dir = tempfile::tempdir().unwrap();
@@ -989,5 +1119,79 @@ mod tests {
         let s = crate::item_templates::ItemKind::Class.files(&proj.join("Models"), "Order")[0].1.clone();
         assert!(s.starts_with("namespace Shop.Core.Models;"), "{s}");
         assert!(s.contains("public class Order"));
+    }
+}
+
+#[cfg(test)]
+mod responsive_settings_tests {
+    use super::*;
+    use egui_kittest::kittest::Queryable;
+
+    #[test]
+    fn settings_stay_bounded_and_keep_the_footer_visible_on_every_page() {
+        let _home = crate::screens::HOME_LOCK.lock().unwrap_or_else(|error| error.into_inner());
+        let home = tempfile::tempdir().unwrap();
+        for size in [vec2(1280.0, 800.0), vec2(800.0, 500.0), vec2(800.0, 300.0), vec2(640.0, 400.0), vec2(480.0, 320.0)] {
+            let mut app = crate::screens::test_app(home.path(), true);
+            // Load the real solution model without starting external SDK/server processes.
+            let solution_path = crate::screens::fixtures().join("TenProjects/TenProjects.slnx");
+            app.workspace = Some(crate::app::WorkspaceState {
+                ws: rc_core::Workspace::open(&solution_path).unwrap(),
+                solution: Some(rc_dotnet::Solution::load(&solution_path).unwrap()),
+            });
+            let mut harness = crate::screens::harness(app, size);
+            let mut widths = Vec::new();
+            for page in [SettingsPage::Appearance, SettingsPage::Editor, SettingsPage::Keymap, SettingsPage::Tools] {
+                let mut draft = Settings::default();
+                if page == SettingsPage::Tools {
+                    let long_path = PathBuf::from(format!("/opt/{}/dotnet", "long-installation-folder/".repeat(20)));
+                    draft.dotnet_path = Some(long_path.clone());
+                    draft.roslyn_path = Some(long_path.clone());
+                    draft.netcoredbg_path = Some(long_path);
+                }
+                harness.state_mut().dialog = Some(Dialog::Settings { draft: Box::new(draft), page });
+                harness.run_steps(5);
+                let modal = harness.ctx.memory(|memory| memory.area_rect(Id::new("settings"))).unwrap();
+                let viewport = egui::Rect::from_min_size(egui::Pos2::ZERO, size);
+                let ok = harness.get_by_label(tr("OK")).rect();
+                let cancel = harness.get_by_label(tr("Cancel")).rect();
+                assert!(viewport.contains_rect(modal), "modal outside {size:?}: {modal:?}");
+                assert!(viewport.contains_rect(ok) && viewport.contains_rect(cancel), "footer outside {size:?}: {ok:?} {cancel:?}");
+                for _ in 0..20 {
+                    harness.run_steps(1);
+                    let settled = harness.ctx.memory(|memory| memory.area_rect(Id::new("settings"))).unwrap();
+                    assert!((settled.height() - modal.height()).abs() < 1.0, "modal height changed: {modal:?} -> {settled:?}");
+                }
+                if page == SettingsPage::Tools {
+                    for browse in harness.get_all_by_label(tr("Browse…")) {
+                        assert!(viewport.contains_rect(browse.rect()), "tool browse button outside viewport");
+                    }
+                }
+                widths.push(modal.width());
+            }
+            assert!(widths.windows(2).all(|pair| (pair[0] - pair[1]).abs() < 1.0), "page widths differ at {size:?}: {widths:?}");
+        }
+    }
+
+    #[test]
+    fn cancelling_settings_preserves_the_original_configuration() {
+        let _home = crate::screens::HOME_LOCK.lock().unwrap_or_else(|error| error.into_inner());
+        let home = tempfile::tempdir().unwrap();
+        let app = crate::screens::test_app(home.path(), true);
+        let original_size = app.settings.editor_font_size;
+        let mut draft = app.settings.clone();
+        draft.editor_font_size = original_size + 4.0;
+        let mut harness = crate::screens::harness(app, vec2(480.0, 320.0));
+        harness.state_mut().dialog = Some(Dialog::Settings { draft: Box::new(draft), page: SettingsPage::Appearance });
+        harness.run_steps(5);
+        harness.get_by_label(tr("Appearance")).click();
+        harness.run_steps(2);
+        harness.get_by_label(tr("Editor")).click();
+        harness.run_steps(2);
+        assert!(matches!(harness.state().dialog, Some(Dialog::Settings { page: SettingsPage::Editor, .. })));
+        harness.get_by_label(tr("Cancel")).click();
+        harness.run_steps(2);
+        assert!(harness.state().dialog.is_none());
+        assert_eq!(harness.state().settings.editor_font_size, original_size);
     }
 }

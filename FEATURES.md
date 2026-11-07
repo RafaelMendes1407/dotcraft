@@ -22,10 +22,10 @@ A source implementation or passing parser test alone does not establish Rider pa
 <!-- summary:start -->
 | Status | Items |
 | --- | --- |
-| ✅ Verified | 0 |
+| ✅ Verified | 1 |
 | 🚧 In progress | 1 |
 | 🟢 Existing | 104 |
-| 🔁 Reuse candidate | 34 |
+| 🔁 Reuse candidate | 33 |
 | ⬜ Backlog | 234 |
 | 🚫 Out of scope | 0 |
 | **Total** | **373** |
@@ -79,6 +79,21 @@ The existing workspace root stays the filter directory; filters stored outside t
 solution root need a separate watcher/search-root audit.
 
 
+## Responsive settings implementation
+
+A-16 adapts CrabCraft's viewport-based settings geometry to DotCraft's four settings
+pages. Narrow windows use a category selector; larger windows retain scrollable
+navigation. Page contents scroll within a fixed area, keeping OK and Cancel visible.
+Tool paths use stacked labels and fields sized to the available page width.
+
+Validation: `cargo test -p rc-app responsive_settings_tests`. Headless regressions load
+the real TenProjects solution model without launching external SDK processes, exercise
+all four pages at 1280×800, 800×500, 800×300, 640×400 and 480×320 logical pixels, check
+stable width and height, verify tool Browse buttons remain visible with long paths, exercise the compact category selector, and confirm Cancel
+discards draft edits. Native file-picker lifecycle is unchanged by this layout feature.
+
+Additional validation: five tests now pass with `cargo test -p rc-app responsive_settings --offline -- --nocapture`. The added regressions exercise actual scrolling to the last Editor option, draft cancellation, long tool paths, and stable bounds across all four pages. The existing PR 4 production implementation is retained. See [responsive settings evidence](docs/implementation/responsive-settings.md).
+
 ## A. Desktop interface and workflow
 
 Source / reuse boundary: `crates/rc-app/src/ui; crates/rc-kit`.
@@ -100,7 +115,7 @@ Source / reuse boundary: `crates/rc-app/src/ui; crates/rc-kit`.
 | A-13 | Localization | 🟢 | Exercise on a real .NET fixture; record evidence. |
 | A-14 | Status bar | 🟢 | Exercise on a real .NET fixture; record evidence. |
 | A-15 | Notifications | 🟢 | Exercise on a real .NET fixture; record evidence. |
-| A-16 | Responsive settings layout | 🔁 | Inspect sibling implementation, adapt and verify in .NET. |
+| A-16 | Responsive settings layout | ✅ | Verified by 5 responsive settings tests, including TenProjects, scrolling, long paths, and Cancel. |
 | A-17 | Scrollable main menu | 🔁 | Inspect sibling implementation, adapt and verify in .NET. |
 | A-18 | Tab docking previews | 🔁 | Inspect sibling implementation, adapt and verify in .NET. |
 | A-19 | Background document saving | 🔁 | Inspect sibling implementation, adapt and verify in .NET. |
