@@ -334,7 +334,8 @@
     "Call Tree": "Árbol de llamadas",
     "Method": "Método",
     "Self": "Propio",
-    "Total": "Total"
+    "Total": "Total",
+    "Workspace edits that create, rename, or delete files are not supported. No changes were applied.": "Workspace edits that create, rename, or delete files are not supported. No changes were applied."
   },
   "terminal": {
     "Local": "Local",
