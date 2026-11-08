@@ -334,7 +334,8 @@
     "Call Tree": "Arbre des appels",
     "Method": "Méthode",
     "Self": "Propre",
-    "Total": "Total"
+    "Total": "Total",
+    "Search files, types, symbols, actions and settings": "Search files, types, symbols, actions and settings"
   },
   "terminal": {
     "Local": "Local",

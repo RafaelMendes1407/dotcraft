@@ -334,7 +334,8 @@
     "Call Tree": "Aufrufbaum",
     "Method": "Methode",
     "Self": "Eigen",
-    "Total": "Gesamt"
+    "Total": "Gesamt",
+    "Search files, types, symbols, actions and settings": "Search files, types, symbols, actions and settings"
   },
   "terminal": {
     "Local": "Lokal",

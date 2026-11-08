@@ -334,7 +334,8 @@
     "Call Tree": "Árbol de llamadas",
     "Method": "Método",
     "Self": "Propio",
-    "Total": "Total"
+    "Total": "Total",
+    "Search files, types, symbols, actions and settings": "Search files, types, symbols, actions and settings"
   },
   "terminal": {
     "Local": "Local",

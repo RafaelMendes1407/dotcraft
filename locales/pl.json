@@ -334,7 +334,8 @@
     "Call Tree": "Drzewo wywołań",
     "Method": "Metoda",
     "Self": "Własny",
-    "Total": "Łącznie"
+    "Total": "Łącznie",
+    "Search files, types, symbols, actions and settings": "Search files, types, symbols, actions and settings"
   },
   "terminal": {
     "Local": "Lokalny",

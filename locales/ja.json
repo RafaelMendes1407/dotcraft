@@ -334,7 +334,8 @@
     "Call Tree": "呼び出しツリー",
     "Method": "メソッド",
     "Self": "自身",
-    "Total": "合計"
+    "Total": "合計",
+    "Search files, types, symbols, actions and settings": "Search files, types, symbols, actions and settings"
   },
   "terminal": {
     "Local": "ローカル",
