@@ -20,6 +20,7 @@ pub enum SettingsPage {
 pub enum Dialog {
     Settings { draft: Box<Settings>, page: SettingsPage },
     About,
+    AttachProcess { pid: String, focus: bool },
     GotoLine { text: String, focus: bool },
     /// ⌘J / ⌥⌘T: live templates at the caret, or to surround the selection.
     Templates { surround: bool, filter: String, selected: usize },
@@ -66,6 +67,7 @@ pub fn show(app: &mut DotCraftApp, ctx: &Context) {
     let outcome = match &mut dialog {
         Dialog::Settings { draft, page } => settings(app, ctx, draft, page),
         Dialog::About => about(app, ctx),
+        Dialog::AttachProcess { pid, focus } => attach_process(app, ctx, pid, focus),
         Dialog::GotoLine { text, focus } => goto_line(app, ctx, text, focus),
         Dialog::BookmarkMnemonic { path, line } => bookmark_mnemonic(app, ctx, path, *line),
         Dialog::Templates { surround, filter, selected } => templates(app, ctx, *surround, filter, selected),
@@ -1138,4 +1140,116 @@ mod tests {
         assert!(s.starts_with("namespace Shop.Core.Models;"), "{s}");
         assert!(s.contains("public class Order"));
     }
+}
+
+/// Accept a decimal PID; exclude the IDE itself to avoid self-debugging deadlocks.
+fn attach_pid(text: &str) -> Option<u32> {
+    let text = text.trim();
+    if text.is_empty() || !text.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    text.parse::<u32>().ok().filter(|&pid| pid != 0 && pid != std::process::id())
+}
+
+fn attach_process(app: &mut DotCraftApp, ctx: &Context, text: &mut String, focus: &mut bool) -> Outcome {
+    let pid = attach_pid(text);
+    let available = app.workspace.is_some() && !app.debugger.active() && app.debugger.downloading.is_none();
+    let mut enter = false;
+    let ((attach, cancel), esc) = modal(ctx, "attach_process", 460.0, |ui| {
+        title(ui, tr("Attach to Process…"));
+        ui.label(tr("Attach to a running .NET process by its process ID."));
+        ui.label(tr("Stopping debugging detaches and leaves the process running."));
+        ui.add_space(8.0);
+        let response = ui.add(egui::TextEdit::singleline(text).hint_text(tr("Process ID")).desired_width(f32::INFINITY));
+        if std::mem::take(focus) {
+            response.request_focus();
+        }
+        enter = (response.has_focus() || response.lost_focus()) && ui.input(|i| i.key_pressed(Key::Enter));
+        if app.workspace.is_none() {
+            ui.label(tr("Open a project before attaching to a process"));
+        } else if !available {
+            ui.label(tr("Stop the current debug session before attaching"));
+        } else if !text.is_empty() && pid.is_none() {
+            ui.colored_label(rc_kit::pal(ui).error, tr("Enter a positive process ID other than DotCraft's own process"));
+        }
+        buttons(ui, tr("Attach"), pid.is_some() && available)
+    });
+    if cancel || esc {
+        return Outcome::Close;
+    }
+    // Parse after the input widget updates the text, including Enter in the same frame.
+    if (attach || enter) && available && let Some(pid) = attach_pid(text) {
+        let outputs = app.debugger.attach(pid, app.settings.netcoredbg_path.as_deref(), &app.docs);
+        app.handle_debug(outputs);
+        return Outcome::Close;
+    }
+    Outcome::Keep
+}
+
+#[cfg(test)]
+mod attach_tests {
+    use super::attach_pid;
+
+    #[test]
+    fn validates_external_process_ids() {
+        assert_eq!(attach_pid(" 42 "), Some(42).filter(|&pid| pid != std::process::id()));
+        for text in ["", "0", "-1", "+1", "1.5", "42abc", "4294967296", &std::process::id().to_string()] {
+            assert_eq!(attach_pid(text), None, "{text}");
+        }
+    }
+
+    #[test]
+    fn attach_dialog_requires_a_workspace_for_button_and_enter() {
+        use super::{Dialog, Settings};
+        use egui_kittest::kittest::{NodeT, Queryable};
+        use rc_core::{Waker, Workspace};
+        let _lock = crate::screens::HOME_LOCK.lock().unwrap_or_else(|error| error.into_inner());
+        rc_kit::i18n::set_lang(rc_kit::i18n::Lang::En);
+        for mode in ["welcome", "standalone", "workspace"] {
+            let temp = tempfile::tempdir().unwrap();
+            let root = temp.path().join("project");
+            std::fs::create_dir(&root).unwrap();
+            let adapter = temp.path().join("not-an-executable-adapter");
+            // Adapter selection is deterministic, but this non-executable file cannot
+            // start an adapter or attach to an unrelated real operating-system process.
+            std::fs::write(&adapter, b"").unwrap();
+            let mut app = crate::app::DotCraftApp::with_settings(
+                Settings { netcoredbg_path: Some(adapter), ..Settings::default() }, Waker::noop(), None,
+            );
+            if mode == "standalone" {
+                let file = root.join("notes.txt");
+                std::fs::write(&file, "Standalone file").unwrap();
+                app.open_file(&file);
+            } else if mode == "workspace" {
+                app.workspace = Some(crate::app::WorkspaceState { ws: Workspace::open(&root).unwrap(), solution: None });
+            }
+            assert!(app.runner.selected_config().is_none());
+            app.run_ide_action(&egui::Context::default(), rc_editor::Action::AttachProcess);
+            let pid = if std::process::id() == 42 { "43" } else { "42" };
+            app.dialog = Some(Dialog::AttachProcess { pid: pid.into(), focus: true });
+            let mut first = true;
+            let mut harness = egui_kittest::Harness::builder().with_size(egui::vec2(800.0, 600.0)).build_ui_state(
+                move |ui, app: &mut crate::app::DotCraftApp| {
+                    if std::mem::take(&mut first) { rc_kit::theme::install_fonts(ui.ctx()); return; }
+                    super::show(app, ui.ctx());
+                }, app,
+            );
+            harness.run_steps(3);
+            assert_eq!(harness.get_by_label("Attach").accesskit_node().is_disabled(), mode != "workspace", "{mode}");
+            if mode != "workspace" { harness.get_by_label("Open a project before attaching to a process"); }
+            harness.get_by_role(egui::accesskit::Role::TextInput).focus();
+            harness.run_steps(1);
+            harness.key_press(egui::Key::Enter);
+            harness.run_steps(2);
+            if mode == "workspace" {
+                assert!(harness.state().debugger.session.is_some());
+                assert_eq!(harness.state().dock.bottom, Some(crate::toolwindow::ToolWindow::Debug));
+            } else {
+                assert!(matches!(harness.state().dialog, Some(Dialog::AttachProcess { .. })));
+                assert!(harness.state().debugger.session.is_none());
+                assert!(harness.state().debugger.downloading.is_none());
+            }
+        }
+    }
+
 }

@@ -334,7 +334,17 @@
     "Call Tree": "呼び出しツリー",
     "Method": "メソッド",
     "Self": "自身",
-    "Total": "合計"
+    "Total": "合計",
+    "Open a project before attaching to a process": "Open a project before attaching to a process",
+    "Attach to Process…": "Attach to Process…",
+    "Attach": "Attach",
+    "Process ID": "Process ID",
+    "Attach to a running .NET process by its process ID.": "Attach to a running .NET process by its process ID.",
+    "Stopping debugging detaches and leaves the process running.": "Stopping debugging detaches and leaves the process running.",
+    "Enter a positive process ID other than DotCraft's own process": "Enter a positive process ID other than DotCraft's own process",
+    "Stop the current debug session before attaching": "Stop the current debug session before attaching",
+    "Process {pid}": "Process {pid}",
+    "Attaching to process {pid}…": "Attaching to process {pid}…"
   },
   "terminal": {
     "Local": "ローカル",

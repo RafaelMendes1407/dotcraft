@@ -141,7 +141,7 @@ pub fn show(app: &mut DotCraftApp, ui: &mut Ui) {
                             ui.close();
                         }
                     });
-                    if (app.runner.busy() || app.debugger.active()) && theme::icon_button_sized(ui, ico::STOP, true, &format!("{}{}", tr("Stop"), shortcut(Action::StopRun)), 30.0).clicked() {
+                    if (app.runner.busy() || app.debugger.active() || app.debugger.downloading.is_some()) && theme::icon_button_sized(ui, ico::STOP, true, &format!("{}{}", tr("Stop"), shortcut(Action::StopRun)), 30.0).clicked() {
                         app.pending.push(Action::StopRun);
                     }
                     if theme::icon_button_sized(ui, ico::DEBUG, true, &format!("{}{}", tr("Debug"), shortcut(Action::Debug)), 30.0).clicked() {
@@ -181,6 +181,11 @@ pub fn show(app: &mut DotCraftApp, ui: &mut Ui) {
                                 app.edit_run_config(Some(name));
                                 ui.close();
                             }
+                        }
+                        ui.separator();
+                        if theme::menu_item(ui, Some(ico::DEBUG), tr("Attach to Process…"), false).clicked() {
+                            app.pending.push(Action::AttachProcess);
+                            ui.close();
                         }
                         // Compound configurations: several applications at once.
                         if app.runner.app_names().len() > 1 {

@@ -445,6 +445,7 @@ impl DotCraftApp {
         self.workspace = None;
         self._watcher = None;
         self.insight.stop();
+        self.debugger.stop();
         self.runner.stop_all();
         self.runner.clear();
         self.files.close();
@@ -892,7 +893,7 @@ impl DotCraftApp {
                 }
             }
             Action::StopRun => {
-                if self.debugger.active() {
+                if self.debugger.active() || self.debugger.downloading.is_some() {
                     self.debugger.stop();
                 } else {
                     self.runner.stop_all();
@@ -903,6 +904,9 @@ impl DotCraftApp {
                 if let Some(s) = &mut self.debugger.session {
                     s.continue_();
                 }
+            }
+            Action::AttachProcess => {
+                self.dialog = Some(Dialog::AttachProcess { pid: String::new(), focus: true });
             }
             Action::Debug => {
                 self.save_all_docs();
