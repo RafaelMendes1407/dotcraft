@@ -39,6 +39,7 @@ solution's path and supplies its display name, preserving it as the command targ
   documents and unsaved text.
 - Run filter builds from the underlying solution directory so CLI SDK selection follows its
   `global.json`. The filter remains an absolute CLI target even when requested using a relative path.
+- Select test projects from the filtered solution, excluding test projects outside its selection.
 
 The referenced source must be `.sln` or `.slnx`, preventing recursive filter loading.
 Loading the solution/filter model reads files and does not itself execute project code.
@@ -53,6 +54,7 @@ commit `f30ac7180ce8dd492633235f3c3dbf2f4107e61b`, using a dedicated Cargo targe
 cargo test -p rc-dotnet -p rc-core --lib --locked --offline --jobs 2
 cargo test -p rc-app solution_filter_ --locked --offline --jobs 2 -- --nocapture
 cargo test -p rc-dotnet --test solution_filter --locked --offline --jobs 2 -- --ignored --nocapture
+cargo test -p rc-dotnet --test solution_filter solution_filter_selects_only_included_test_projects --locked --offline --jobs 2
 ```
 
 Results: 47 library tests, two headless application tests, and one actual SDK build test passed.
@@ -73,6 +75,13 @@ an unrelated excluded project containing invalid C# does not. The source has a v
 SDK policy and the filter directory deliberately has an unusable policy, proving the CLI
 uses the source working directory. Package sources are cleared, and shared Shop outputs are
 never touched.
+
+`solution_filter_selects_only_included_test_projects` uses the real Shop solution with a
+filter stored outside the source directory. It confirms that test discovery returns the
+selected xUnit project while excluding the NUnit and MSTest projects and a selected
+non-test project. This follow-up passed its integration test and all 42 `rc-dotnet` library
+tests with `--locked --offline` in `/tmp/dotcraft-solution-filter-target`. It does not start
+the SDK or run the selected tests.
 
 ## Remaining scope
 

@@ -76,10 +76,11 @@ in a subdirectory, empty selections, duplicate selections and invalid input.
 A headless application regression also renders the real explorer with the filtered
 TenProjects solution and checks that selected modules appear and excluded modules do not.
 Verification: `cargo test -p rc-app solution_filter_explorer_shows_only_selected_real_projects`.
-Remaining: real SDK build/test execution, Roslyn behavior
-with filters, interactive editing, and dependency-loading behavior. B-14 remains 🚧. Additional independent evidence and remaining scope are recorded in [solution filter implementation](docs/implementation/solution-filters.md).
-The existing workspace root stays the filter directory; filters stored outside the
-solution root need a separate watcher/search-root audit.
+Follow-up coverage verifies the external-filter workspace lifecycle and an actual SDK
+build. Test-project selection now accepts `.slnf` and selects only test projects included
+by the filter; actual test execution and filter-specific Roslyn behavior remain unvalidated.
+B-14 remains 🚧. Exact evidence and remaining scope are recorded in the
+[solution filter implementation](docs/implementation/solution-filters.md).
 
 
 ## A. Desktop interface and workflow
@@ -138,7 +139,7 @@ Source / reuse boundary: `crates/rc-dotnet; crates/rc-core/src/workspace.rs`.
 | B-11 | Launch settings profiles | 🟢 | Exercise on a real .NET fixture; record evidence. |
 | B-12 | NuGet search | 🟢 | Exercise on a real .NET fixture; record evidence. |
 | B-13 | NuGet installation and removal | 🟢 | Exercise on a real .NET fixture; record evidence. |
-| B-14 | JSON .slnf solution filters | 🚧 | Parser and explorer verified; validate SDK and language-server behavior. |
+| B-14 | JSON .slnf solution filters | 🚧 | Parser, explorer, SDK build, and test selection verified; validate test execution and Roslyn behavior. |
 | B-15 | Interactive filter creation and editing | ⬜ | Implement with integration and UI acceptance evidence. |
 | B-16 | Unload and reload individual projects | ⬜ | Implement with integration and UI acceptance evidence. |
 | B-17 | Project references editor | ⬜ | Implement with integration and UI acceptance evidence. |
